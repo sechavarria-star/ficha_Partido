@@ -1,0 +1,13 @@
+# Datos sensibles: planillas con nombres y DNI de menores — NO subir
+*.pdf
+
+# macOS
+.DS_Store
+
+# clasp (no exponer el scriptId/credenciales del proyecto)
+.clasp.json
+.clasprc.json
+
+# temporales
+node_modules/
+*.log

@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" id="vp" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Ficha de Partido - CUBA Rugby</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#060e1f;--navy-mid:#111827;--navy-card:#1a2236;
+  --blue:#1a4fa0;--blue-light:#2e6fd4;
+  --white:#f0f4ff;--muted:#5a7aaa;--border:#1e3050;
+  --green:#0a8f4a;--red:#dc2626;--amber:#d97706;--yellow:#eab308;
+  --radius:12px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--navy);color:var(--white);font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent;}
+input,select,textarea{font-size:16px !important;}
+
+/* ZOOM SLIDER */
+.zoom-bar{position:fixed;bottom:0;left:0;right:0;z-index:999;background:rgba(6,14,31,.95);border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:8px 14px;}
+.zoom-bar label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;white-space:nowrap;flex-shrink:0;}
+.zoom-bar input[type=range]{flex:1;accent-color:var(--blue-light);}
+.zoom-bar .zoom-val{font-size:13px;font-weight:700;color:var(--white);min-width:42px;text-align:right;flex-shrink:0;}
+.zoom-bar .zoom-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px;flex-shrink:0;}
+.zoom-toggle{position:fixed;bottom:60px;left:14px;z-index:998;background:var(--navy-card);border:1px solid var(--border);border-radius:20px;padding:7px 13px;font-size:11px;font-family:'DM Sans',sans-serif;color:var(--muted);cursor:pointer;letter-spacing:1px;}
+
+/* HEADER */
+.app-header{background:linear-gradient(135deg,#060e1f 0%,#0d2248 60%,#0a1a3a 100%);border-bottom:3px solid var(--blue-light);padding:12px 16px 10px;position:sticky;top:0;z-index:200;}
+.header-row{display:flex;align-items:center;gap:10px;}
+.header-tag{font-size:11px;letter-spacing:3px;color:#7aaee8;text-transform:uppercase;}
+.header-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--white);line-height:1;}
+
+/* SCREENS */
+.screen{display:none;}
+.screen.active{display:block;}
+
+/* SETUP */
+.setup-wrap{padding:20px 16px;}
+.setup-logo{text-align:center;padding:10px 0 24px;}
+.setup-logo .club{font-family:'Bebas Neue',sans-serif;font-size:42px;color:var(--white);letter-spacing:3px;}
+.setup-logo .sub{font-size:16px;color:var(--muted);letter-spacing:2px;margin-top:4px;}
+.field-group{margin-bottom:16px;}
+.field-label{font-size:18px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.field-input{width:100%;padding:20px 16px;background:var(--navy-card);border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:24px;color:var(--white);outline:none;appearance:none;-webkit-appearance:none;display:block;touch-action:manipulation;}
+.field-input:focus{border-color:var(--blue-light);}
+.field-input::placeholder{color:var(--muted);}
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--muted);margin:20px 0 12px;}
+.jugador-add{display:flex;gap:8px;margin-bottom:12px;}
+.jugador-add input{flex:1;padding:20px 16px;background:var(--navy-card);border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:16px !important;color:var(--white);outline:none;}
+.jugador-add input:focus{border-color:var(--blue-light);}
+.jugador-add input::placeholder{color:var(--muted);}
+.btn-add{padding:20px 22px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;cursor:pointer;flex-shrink:0;}
+.jugador-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.jugador-chip{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.jugador-chip .num{width:40px;height:40px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;}
+.jugador-chip .name{flex:1;font-size:20px;}
+.jugador-chip .del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:24px;padding:0 4px;}
+.btn-primary{width:100%;padding:24px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;cursor:pointer;display:block;margin-top:20px;margin-bottom:80px;}
+
+/* PLANILLA CARD */
+.planilla-card{background:var(--navy-card);border:1.5px solid var(--blue);border-radius:var(--radius);padding:16px;margin-bottom:18px;}
+.planilla-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--white);margin-bottom:4px;}
+.planilla-sub{font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.4;}
+.planilla-sub a{color:#7aaee8;font-weight:600;}
+.btn-cargar{width:100%;padding:16px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;cursor:pointer;}
+.btn-cargar:disabled{opacity:.5;cursor:default;}
+.planilla-status{font-size:13px;color:var(--muted);margin-top:10px;min-height:0;}
+.planilla-status.err{color:#f87171;}
+.planilla-status.ok{color:#4ade80;}
+.planilla-teams{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;}
+.planilla-teams:empty{display:none;}
+.team-pick{padding:16px 0;background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;cursor:pointer;}
+.team-pick:disabled{opacity:.3;cursor:not-allowed;}
+.team-pick.sel{background:var(--blue);color:#fff;border-color:var(--blue-light);}
+.planilla-badge{display:inline-block;margin-top:10px;padding:4px 10px;background:rgba(46,111,212,.18);border:1px solid var(--blue-light);border-radius:14px;font-size:13px;color:#93c5fd;}
+
+/* RECOVERY BANNER */
+.recovery-banner{background:var(--blue);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;display:none;}
+.recovery-banner.visible{display:block;}
+.recovery-title{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px;color:#fff;margin-bottom:3px;}
+.recovery-sub{font-size:12px;color:#93c5fd;margin-bottom:12px;}
+.recovery-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.btn-retomar{padding:12px;background:#fff;color:var(--blue);border:none;border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;}
+.btn-nuevo{padding:12px;background:transparent;color:#93c5fd;border:1.5px solid rgba(255,255,255,.3);border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;}
+
+/* MATCH SCREEN */
+.match-wrap{padding:10px;padding-bottom:80px;}
+.match-header{background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;margin-bottom:6px;}
+.match-vs{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;color:var(--white);}
+.match-meta{font-size:16px;color:var(--muted);margin-top:4px;}
+
+.score-wrap{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 14px;margin-bottom:8px;}
+.score-team{font-size:18px;color:var(--muted);text-align:center;font-weight:600;}
+.score-num{font-family:'Bebas Neue',sans-serif;font-size:86px;color:var(--white);text-align:center;line-height:1;}
+.score-sep{font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--border);}
+
+.timer-wrap{background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:6px;text-align:center;}
+.timer-display{font-family:'Bebas Neue',sans-serif;font-size:96px;letter-spacing:4px;color:var(--white);line-height:1;margin-bottom:10px;}
+.timer-display.running{color:#4ade80;}
+.timer-display.overtime{color:var(--red);}
+.progress-wrap{background:var(--border);border-radius:6px;height:10px;overflow:hidden;margin-bottom:6px;}
+.progress-bar{height:100%;border-radius:4px;background:#4ade80;transition:width .5s linear,background .3s;}
+.progress-bar.overtime{background:var(--red);}
+.progress-info-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.progress-start,.progress-end{font-size:14px;color:var(--muted);}
+.progress-label{font-size:18px;font-weight:700;color:#4ade80;}
+.progress-label.overtime{color:var(--red);font-size:18px;}
+.periodo-row{display:flex;gap:6px;justify-content:center;margin-bottom:8px;flex-wrap:wrap;}
+.periodo-btn{padding:12px 24px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:18px;font-weight:600;cursor:pointer;}
+.periodo-btn.active{border-color:var(--blue-light);background:rgba(46,111,212,.15);color:var(--white);}
+.timer-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.btn-timer{padding:18px;border:none;border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;cursor:pointer;}
+.btn-start{background:var(--green);color:#fff;}
+.btn-stop{background:var(--red);color:#fff;}
+.btn-reset{background:var(--navy-mid);color:var(--muted);border:1px solid var(--border);}
+
+/* TEAM TABS */
+.team-tabs{display:grid;grid-template-columns:1fr 1fr;border-radius:var(--radius-sm);overflow:hidden;border:1.5px solid var(--border);margin-bottom:8px;}
+.team-tab{padding:20px;border:none;background:var(--navy-card);color:var(--muted);font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;cursor:pointer;}
+.team-tab.active.cuba{background:var(--blue);color:#fff;}
+.team-tab.active.rival{background:var(--red);color:#fff;}
+
+/* EVENT BUTTONS */
+.events-section{margin-bottom:8px;}
+.events-label{font-size:16px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;}
+.events-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.btn-event{height:130px;border:none;border-radius:var(--radius-sm);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;}
+.btn-event:active{opacity:.85;}
+.btn-event .ev-icon{font-size:44px;line-height:1;}
+.btn-event .ev-name{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:0.5px;}
+.btn-event .ev-pts{font-size:16px;opacity:.75;}
+.btn-try{background:rgba(10,143,74,.2);border:1.5px solid var(--green);color:#34d399;}
+.btn-try-penal{background:rgba(10,143,74,.12);border:1.5px solid #059669;color:#6ee7b7;}
+.btn-conv{background:rgba(46,111,212,.2);border:1.5px solid var(--blue-light);color:#93c5fd;}
+.btn-penal{background:rgba(217,119,6,.2);border:1.5px solid var(--amber);color:#fbbf24;}
+.btn-drop{background:rgba(147,51,234,.2);border:1.5px solid #9333ea;color:#c084fc;}
+.rival-event{background:rgba(220,38,38,.15);border:1.5px solid var(--red);color:#f87171;}
+.cards-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;}
+.btn-card{height:110px;border:none;border-radius:var(--radius-sm);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;}
+.btn-card:active{opacity:.85;}
+.btn-card .card-icon{width:34px;height:44px;border-radius:4px;}
+.btn-card .card-name{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:0.5px;}
+.btn-amarilla{background:rgba(234,179,8,.15);border:1.5px solid var(--yellow);color:var(--yellow);}
+.btn-amarilla .card-icon{background:var(--yellow);}
+.btn-roja{background:rgba(220,38,38,.15);border:1.5px solid var(--red);color:var(--red);}
+.btn-roja .card-icon{background:var(--red);}
+.btn-azul{background:rgba(37,99,235,.15);border:1.5px solid #3b82f6;color:#60a5fa;}
+.btn-azul .card-icon{background:#3b82f6;}
+
+/* CAMBIO (mismo tamaño que los botones de puntos) */
+.btn-cambio-ev{background:rgba(20,184,166,.18);border:1.5px solid #14b8a6;color:#5eead4;}
+
+/* HISTORIAL */
+.historial-wrap{background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:8px;}
+.historial-hdr{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.historial-hdr span{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--muted);}
+.historial-list{max-height:260px;overflow-y:auto;}
+.histo-item{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid rgba(30,48,80,.5);}
+.histo-item:last-child{border-bottom:none;}
+.histo-item.rival-ev .histo-tipo{color:#f87171;}
+.histo-min{font-size:14px;color:var(--muted);min-width:40px;font-weight:600;flex-shrink:0;}
+.histo-icon{font-size:22px;width:28px;text-align:center;flex-shrink:0;}
+.histo-info{flex:1;min-width:0;}
+.histo-tipo{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.histo-jug{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.histo-pts{font-size:15px;font-weight:700;color:var(--green);flex-shrink:0;min-width:52px;text-align:right;}
+.histo-pts.cero{color:var(--muted);}
+.histo-actions{display:flex;gap:4px;flex-shrink:0;}
+.histo-btn{width:36px;height:36px;border:none;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;}
+.histo-edit{background:rgba(46,111,212,.2);color:#7aaee8;}
+.histo-del{background:rgba(220,38,38,.2);color:#f87171;}
+.empty-msg{padding:14px;text-align:center;font-size:13px;color:var(--muted);}
+
+/* FAB */
+.fab-export{position:fixed;bottom:60px;right:16px;z-index:300;display:none;}
+.fab-export.visible{display:block;}
+.fab-btn{display:flex;align-items:center;gap:8px;padding:12px 18px;background:#7aaee8;color:#060e1f;border:none;border-radius:30px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;font-weight:700;}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:#0d1a2e;border:1px solid var(--border);border-radius:var(--radius);padding:20px 16px 28px;width:100%;max-width:420px;}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+.modal-field{margin-bottom:14px;}
+.modal-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.modal select,.modal input[type=text],.modal input[type=number]{width:100%;padding:16px 14px;background:var(--navy-card);border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:16px !important;font-family:'DM Sans',sans-serif;color:var(--white);outline:none;appearance:none;-webkit-appearance:none;}
+.modal select:focus,.modal input:focus{border-color:var(--blue-light);}
+.modal select option{background:#0d1a2e;}
+.modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
+.btn-cancel{padding:14px;background:transparent;border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;}
+.btn-confirm{padding:14px;background:var(--blue);border:none;border-radius:var(--radius-sm);color:#fff;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;cursor:pointer;}
+
+/* RESUMEN */
+#screenResumen{background:var(--navy);}
+#screenResumen .resumen-wrap{padding:16px;padding-bottom:80px;}
+.resumen-card{background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;}
+.resumen-score{text-align:center;margin-bottom:12px;}
+.resumen-score .num{font-family:'Bebas Neue',sans-serif;font-size:64px;color:var(--white);line-height:1;}
+.resumen-score .label{font-size:12px;color:var(--muted);}
+.resumen-table{width:100%;border-collapse:collapse;font-size:13px;}
+.resumen-table th{padding:6px 8px;background:rgba(26,79,160,.2);color:var(--muted);font-weight:600;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;}
+.resumen-table td{padding:7px 8px;border-bottom:1px solid rgba(30,48,80,.5);}
+.resumen-table tr:last-child td{border-bottom:none;}
+.tag-min{font-size:11px;color:var(--muted);}
+.tag-ev{font-weight:600;}
+.tag-jug{color:var(--muted);}
+.tag-pts{font-weight:700;color:var(--green);}
+.tag-pts.cero{color:var(--muted);}
+.export-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+.btn-export{padding:13px;border:none;border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;}
+.btn-pdf{background:#dc2626;color:#fff;}
+.btn-excel{background:#0a8f4a;color:#fff;}
+.btn-volver{width:100%;padding:20px;background:var(--navy-card);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--white);font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;cursor:pointer;margin-top:12px;display:block;}
+
+/* DISABLED EVENT BUTTONS */
+.btn-event:disabled{opacity:.3;cursor:not-allowed;}
+.btn-card:disabled{opacity:.3;cursor:not-allowed;}
+
+/* PRINT */
+@media print{
+  .app-header,.fab-export,.timer-btns,.events-section,.btn-volver,.export-btns,.zoom-bar,.zoom-toggle{display:none!important;}
+  body{background:#fff;color:#000;}
+  .resumen-card{background:#fff;border:1px solid #ddd;}
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-row">
+    <div>
+      <div class="header-tag">CUBA Rugby</div>
+      <div class="header-title" id="headerTitle">Ficha de Partido</div>
+    </div>
+  </div>
+</header>
+
+<!-- SETUP -->
+<div class="screen active" id="screenSetup"><div class="setup-wrap">
+  <div class="setup-logo">
+    <div class="club">CUBA RUGBY</div>
+    <div class="sub">FICHA DE PARTIDO</div>
+  </div>
+
+  <div class="recovery-banner" id="recoveryBanner">
+    <div class="recovery-title" id="recoveryTitle">Partido en curso</div>
+    <div class="recovery-sub" id="recoverySub">Tenes un partido sin terminar</div>
+    <div class="recovery-btns">
+      <button class="btn-retomar" onclick="retomarPartido()">RETOMAR</button>
+      <button class="btn-nuevo" onclick="descartarRecovery()">PARTIDO NUEVO</button>
+    </div>
+  </div>
+
+  <div class="planilla-card" id="planillaCard">
+    <div class="planilla-title">Autocompletar desde planilla</div>
+    <div class="planilla-sub">
+      Dejá los 4 PDF en <a id="folderLink" href="#" target="_blank" rel="noopener" onclick="abrirCarpeta(event)">la carpeta de planillas</a> y leelos para cargar el partido y el plantel.
+    </div>
+    <button class="btn-cargar" id="btnCargarPlanillas" onclick="leerPlanillas()">LEER PLANILLAS</button>
+    <div class="planilla-status" id="planillaStatus"></div>
+    <div class="planilla-teams" id="planillaTeams"></div>
+    <div id="planillaBadge"></div>
+  </div>
+
+  <div class="field-group">
+    <div class="field-label">Rival</div>
+    <input class="field-input" id="rivalInput" type="text" inputmode="text" placeholder="Nombre del rival" autocomplete="off" />
+  </div>
+  <div class="field-group">
+    <div class="field-label">Fecha</div>
+    <input class="field-input" id="fechaInput" type="date" />
+  </div>
+  <div class="field-group">
+    <div class="field-label">Cancha</div>
+    <select class="field-input" id="canchaInput">
+      <option value="">-- Seleccionar --</option>
+      <option value="Local">Local</option>
+      <option value="Visitante">Visitante</option>
+      <option value="Neutral">Neutral</option>
+    </select>
+  </div>
+  <div class="field-group">
+    <div class="field-label">Camada</div>
+    <select class="field-input" id="camadaInput">
+      <option value="">-- Seleccionar --</option>
+      <option value="M13">M13</option>
+      <option value="M14">M14</option>
+      <option value="M15">M15</option>
+    </select>
+  </div>
+  <div class="field-group">
+    <div class="field-label">Cantidad de tiempos</div>
+    <select class="field-input" id="cantTiemposInput">
+      <option value="2">2 tiempos</option>
+      <option value="3">3 tiempos</option>
+    </select>
+  </div>
+  <div class="field-group">
+    <div class="field-label">Duracion por tiempo (min)</div>
+    <input class="field-input" id="durTiempoInput" type="number" min="1" max="60" value="35" placeholder="35" />
+  </div>
+  <div class="section-title">Jugadores CUBA</div>
+  <div class="jugador-add">
+    <input id="jugNumInput" type="text" inputmode="numeric" placeholder="#" style="max-width:64px;" autocomplete="off" />
+    <input id="jugNomInput" type="text" inputmode="text" placeholder="Apellido, Nombre" autocomplete="off" />
+    <button class="btn-add" onclick="addJugador()">+</button>
+  </div>
+  <div class="jugador-list" id="jugadorList"></div>
+
+  <button class="btn-primary" id="btnIniciar" onclick="iniciarPartido()">INICIAR PARTIDO</button>
+</div></div>
+
+<!-- MATCH -->
+<div class="screen" id="screenMatch"><div class="match-wrap">
+
+  <div class="match-header">
+    <div class="match-vs" id="matchVs">CUBA vs RIVAL</div>
+    <div class="match-meta" id="matchMeta"></div>
+  </div>
+
+  <!-- Score -->
+  <div class="score-wrap">
+    <div>
+      <div class="score-team">CUBA</div>
+      <div class="score-num" id="scoreCuba">0</div>
+    </div>
+    <div class="score-sep">-</div>
+    <div>
+      <div class="score-team" id="scoreRivalLabel">RIVAL</div>
+      <div class="score-num" id="scoreRival" style="color:#f87171;">0</div>
+    </div>
+  </div>
+
+  <!-- Timer -->
+  <div class="timer-wrap">
+    <div class="timer-display" id="timerDisplay">00:00</div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-info-row">
+      <span class="progress-start">0:00</span>
+      <span class="progress-label" id="progressLabel">35:00 restantes</span>
+      <span class="progress-end" id="progressEnd">35:00</span>
+    </div>
+    <div class="periodo-row" id="periodoRow">
+      <button class="periodo-btn active" id="btn1T" onclick="setPeriodo('1T')">1er TIEMPO</button>
+      <button class="periodo-btn" id="btn2T" onclick="setPeriodo('2T')">2do TIEMPO</button>
+    </div>
+    <div class="timer-btns">
+      <button class="btn-timer btn-start" id="btnStartStop" onclick="toggleTimer()">INICIAR</button>
+      <button class="btn-timer btn-reset" onclick="resetTimer()">REINICIAR</button>
+    </div>
+  </div>
+
+  <!-- Eventos tabs -->
+  <div class="events-section">
+    <div class="team-tabs" id="teamTabs">
+      <button class="team-tab active" id="tabCuba" onclick="setTeamTab('CUBA')">CUBA</button>
+      <button class="team-tab" id="tabRival" onclick="setTeamTab('RIVAL')">RIVAL</button>
+    </div>
+
+    <div class="events-label" id="puntosLabel">Puntos</div>
+    <div class="events-grid">
+      <button class="btn-event btn-try tab-btn" id="btnTry" onclick="onEventBtn('Try',5,'&#x1F3C9;')">
+        <span class="ev-icon">&#x1F3C9;</span>
+        <span class="ev-name">TRY</span>
+        <span class="ev-pts">5 pts</span>
+      </button>
+      <button class="btn-event btn-try-penal tab-btn" id="btnTryPenal" onclick="onEventBtn('Try Penal',5,'&#x1F3C9;')">
+        <span class="ev-icon">&#x1F3C9;</span>
+        <span class="ev-name">TRY PENAL</span>
+        <span class="ev-pts">5 pts</span>
+      </button>
+      <button class="btn-event btn-conv tab-btn" id="btnConv" onclick="onEventBtn('Conversion',2,'&#x1F3AF;')">
+        <span class="ev-icon">&#x1F3AF;</span>
+        <span class="ev-name">CONVERSION</span>
+        <span class="ev-pts">2 pts</span>
+      </button>
+      <button class="btn-event btn-penal tab-btn" id="btnPenal" onclick="onEventBtn('Penal',3,'&#x1F94A;')">
+        <span class="ev-icon">&#x1F94A;</span>
+        <span class="ev-name">PENAL</span>
+        <span class="ev-pts">3 pts</span>
+      </button>
+      <button class="btn-event btn-drop tab-btn" id="btnDrop" onclick="onEventBtn('Drop',3,'&#x1F91E;')">
+        <span class="ev-icon">&#x1F91E;</span>
+        <span class="ev-name">DROP</span>
+        <span class="ev-pts">3 pts</span>
+      </button>
+      <button class="btn-event btn-cambio-ev" id="btnCambio" onclick="openCambioModal()">
+        <span class="ev-icon">&#x1F501;</span>
+        <span class="ev-name">CAMBIO</span>
+        <span class="ev-pts">sale / entra</span>
+      </button>
+    </div>
+
+    <div class="events-label" style="margin-top:12px;">Tarjetas CUBA</div>
+    <div class="cards-grid">
+      <button class="btn-card btn-amarilla" onclick="openModal('Tarjeta Amarilla',0,'&#x1F7E8;','CUBA')">
+        <div class="card-icon"></div>
+        <span class="card-name">AMARILLA</span>
+      </button>
+      <button class="btn-card btn-roja" onclick="openModal('Tarjeta Roja',0,'&#x1F7E5;','CUBA')">
+        <div class="card-icon"></div>
+        <span class="card-name">ROJA</span>
+      </button>
+      <button class="btn-card btn-azul" onclick="openModal('Tarjeta Azul',0,'&#x1F7E6;','CUBA')">
+        <div class="card-icon"></div>
+        <span class="card-name">AZUL</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Historial -->
+  <div class="historial-wrap">
+    <div class="historial-hdr">
+      <span>Historial</span>
+      <span style="font-size:10px;color:var(--muted);">&#9998; editar &nbsp; &#10005; borrar</span>
+    </div>
+    <div class="historial-list" id="historialList">
+      <div class="empty-msg">Sin eventos registrados</div>
+    </div>
+  </div>
+
+  <div class="fab-export visible" id="fabExport">
+    <button class="fab-btn" onclick="irResumen()">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      VER RESUMEN
+    </button>
+  </div>
+</div></div>
+
+<!-- RESUMEN -->
+<div class="screen" id="screenResumen"><div class="resumen-wrap">
+  <div class="resumen-card">
+    <div class="resumen-score">
+      <div class="num" id="resumenScore">0</div>
+      <div class="label" id="resumenVs">CUBA vs RIVAL</div>
+    </div>
+    <div id="resumenMeta" style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:12px;"></div>
+    <table class="resumen-table" id="resumenTable">
+      <thead><tr>
+        <th>Min</th><th>T</th><th>Evento</th><th>Jugador</th><th>Pts</th>
+      </tr></thead>
+      <tbody id="resumenBody"></tbody>
+    </table>
+  </div>
+  <div class="export-btns">
+    <button class="btn-export btn-pdf" onclick="exportarPDF()">EXPORTAR PDF</button>
+    <button class="btn-export btn-excel" onclick="exportarExcel()">EXPORTAR EXCEL</button>
+  </div>
+  <button class="btn-volver" onclick="volverPartido()">&#8592; Volver al partido</button>
+</div></div>
+
+<!-- MODAL EVENTO -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Registrar Try</div>
+    <div class="modal-field">
+      <div class="modal-label">Jugador (lista)</div>
+      <select id="modalJugSelect">
+        <option value="">-- Seleccionar --</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">O numero de camiseta</div>
+      <input type="text" inputmode="numeric" id="modalNumInput" placeholder="Ej: 9" autocomplete="off" />
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarEvento()">CONFIRMAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CAMBIO -->
+<div class="modal-overlay" id="cambioModalOverlay" onclick="if(event.target===this)closeCambioModal()">
+  <div class="modal">
+    <div class="modal-title">&#x1F501; &nbsp;Registrar cambio</div>
+    <div class="modal-field">
+      <div class="modal-label">Sale</div>
+      <select id="cambioSale"><option value="">-- Seleccionar --</option></select>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">O número que sale</div>
+      <input type="text" inputmode="numeric" id="cambioSaleNum" placeholder="Ej: 8" autocomplete="off" />
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Entra</div>
+      <select id="cambioEntra"><option value="">-- Seleccionar --</option></select>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">O número que entra</div>
+      <input type="text" inputmode="numeric" id="cambioEntraNum" placeholder="Ej: 18" autocomplete="off" />
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeCambioModal()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarCambio()">CONFIRMAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModalOverlay" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal">
+    <div class="modal-title">&#9998; Editar evento</div>
+    <div class="modal-field">
+      <div class="modal-label">Tipo</div>
+      <select id="editTipo">
+        <option value="Try">Try</option>
+        <option value="Try Penal">Try Penal</option>
+        <option value="Conversion">Conversion</option>
+        <option value="Penal">Penal</option>
+        <option value="Drop">Drop</option>
+        <option value="Tarjeta Amarilla">Tarjeta Amarilla</option>
+        <option value="Tarjeta Roja">Tarjeta Roja</option>
+        <option value="Tarjeta Azul">Tarjeta Azul</option>
+        <option value="Cambio">Cambio</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="modal-field">
+        <div class="modal-label">Puntos</div>
+        <input type="text" inputmode="numeric" id="editPts" autocomplete="off" />
+      </div>
+      <div class="modal-field">
+        <div class="modal-label">Minuto</div>
+        <input type="text" id="editMinuto" placeholder="00:00" autocomplete="off" />
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="modal-field">
+        <div class="modal-label">Periodo</div>
+        <select id="editPeriodo">
+          <option value="1T">1er Tiempo</option>
+          <option value="2T">2do Tiempo</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <div class="modal-label">Equipo</div>
+        <select id="editEquipo">
+          <option value="CUBA">CUBA</option>
+          <option value="RIVAL">RIVAL</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Jugador</div>
+      <input type="text" id="editJugador" placeholder="Nombre o numero" autocomplete="off" />
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
+      <button class="btn-confirm" onclick="confirmarEdicion()">GUARDAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- ZOOM SLIDER BAR -->
+<div class="zoom-bar" id="zoomBar">
+  <label>ZOOM</label>
+  <input type="range" id="zoomSlider" min="80" max="300" value="100" step="5" oninput="applyZoom(this.value)">
+  <span class="zoom-val" id="zoomVal">100%</span>
+  <button class="zoom-close" onclick="toggleZoomBar()" title="Ocultar">&#10005;</button>
+</div>
+<button class="zoom-toggle" id="zoomToggle" style="display:none;" onclick="toggleZoomBar()">&#128269; ZOOM</button>
+
+<script>
+// ---- ZOOM ----
+var zoomLevel = 100;
+
+function applyZoom(val) {
+  zoomLevel = parseInt(val);
+  document.body.style.zoom = (zoomLevel / 100);
+  document.getElementById('zoomVal').textContent = zoomLevel + '%';
+  try { localStorage.setItem('ficha_zoom', zoomLevel); } catch(e){}
+}
+
+function toggleZoomBar() {
+  var bar    = document.getElementById('zoomBar');
+  var toggle = document.getElementById('zoomToggle');
+  var hidden = bar.style.display === 'none';
+  bar.style.display    = hidden ? 'flex' : 'none';
+  toggle.style.display = hidden ? 'none' : 'block';
+}
+
+// Restore saved zoom on load
+(function(){
+  try {
+    var saved = localStorage.getItem('ficha_zoom');
+    if (saved) {
+      var val = parseInt(saved);
+      zoomLevel = val;
+      document.body.style.zoom = val / 100;
+      var sl = document.getElementById('zoomSlider');
+      var lbl = document.getElementById('zoomVal');
+      if (sl) sl.value = val;
+      if (lbl) lbl.textContent = val + '%';
+    }
+  } catch(e){}
+})();
+
+// ---- STATE ----
+var jugadores      = [];
+var eventos        = [];
+var timerSecs      = 0;
+var timerInt       = null;
+var periodo        = "1T";
+var partido        = {};
+var modalData      = {};
+var startTimestamp = null;
+var editingIdx     = null;
+var planillaSel    = { nPartido: "" };   // planilla A/B/C/D seleccionada
+
+// ---- SETUP ----
+var rivalInput  = document.getElementById("rivalInput");
+var fechaInput  = document.getElementById("fechaInput");
+var canchaInput = document.getElementById("canchaInput");
+var camadaInput = document.getElementById("camadaInput");
+var jugNumInput = document.getElementById("jugNumInput");
+var jugNomInput = document.getElementById("jugNomInput");
+
+fechaInput.value = new Date().toISOString().split("T")[0];
+checkRecovery();
+cargarFolderInfo();
+
+// ---- PLANILLAS (autocompletado desde PDF) ----
+var folderUrl = "";
+
+function cargarFolderInfo(){
+  if (typeof google==='undefined'||!google.script) return;
+  google.script.run
+    .withSuccessHandler(function(res){
+      var st=document.getElementById("planillaStatus");
+      if (res && res.ok && res.url){
+        folderUrl=res.url;
+        var a=document.getElementById("folderLink"); if(a) a.href=res.url;
+      } else if (st){
+        st.className="planilla-status err";
+        st.textContent="No pude abrir la carpeta"+(res&&res.error?": "+res.error:". Falta autorizar (ejecutá getCarpetaInfo en el editor y aceptá los permisos).");
+      }
+    })
+    .withFailureHandler(function(err){
+      var st=document.getElementById("planillaStatus");
+      if(st){ st.className="planilla-status err"; st.textContent="Error al obtener la carpeta: "+(err&&err.message?err.message:err); }
+    })
+    .getCarpetaInfo();
+}
+
+// Click en el link: abre la carpeta. Si ya conocemos la URL la abre directo
+// (gesto del usuario => sin bloqueo de popup); si no, la pide y la abre.
+function abrirCarpeta(e){
+  if(e) e.preventDefault();
+  if(folderUrl){ window.open(folderUrl,"_blank"); return; }
+  var st=document.getElementById("planillaStatus");
+  if(st){ st.className="planilla-status"; st.textContent="Buscando carpeta…"; }
+  if (typeof google==='undefined'||!google.script){
+    if(st){ st.className="planilla-status err"; st.textContent="No disponible fuera de la web app."; }
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res&&res.ok&&res.url){
+        folderUrl=res.url;
+        var a=document.getElementById("folderLink"); if(a) a.href=res.url;
+        window.open(res.url,"_blank");
+        if(st) st.textContent="";
+      } else if(st){
+        st.className="planilla-status err";
+        st.textContent="No pude abrir la carpeta"+(res&&res.error?": "+res.error:". Falta autorizar los permisos de Drive.");
+      }
+    })
+    .withFailureHandler(function(err){
+      if(st){ st.className="planilla-status err"; st.textContent="Error: "+(err&&err.message?err.message:err); }
+    })
+    .getCarpetaInfo();
+}
+
+function leerPlanillas(){
+  var btn    = document.getElementById("btnCargarPlanillas");
+  var status = document.getElementById("planillaStatus");
+  if (typeof google==='undefined'||!google.script){
+    status.className="planilla-status err"; status.textContent="No disponible fuera de la web app."; return;
+  }
+  btn.disabled=true; btn.textContent="LEYENDO… (OCR, ~1-2 min)";
+  status.className="planilla-status"; status.textContent="Procesando PDFs…";
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false; btn.textContent="LEER PLANILLAS";
+      if (!res || res.error){
+        status.className="planilla-status err";
+        status.textContent="Error: "+((res&&res.error)||"sin respuesta");
+        return;
+      }
+      window.__equipos = {};
+      (res.equipos||[]).forEach(function(e){ window.__equipos[e.equipoLetra]=e; });
+      renderTeamPicks(res.equipos||[]);
+      var n=(res.equipos||[]).length;
+      var errs=(res.errores||[]);
+      status.className="planilla-status "+(n?"ok":"err");
+      var base = n ? ("Listo: "+n+" planilla(s). Elegí el equipo.")
+                   : ("No se reconocieron planillas.");
+      if (errs.length){
+        base += "<br><br><b>Detalle ("+errs.length+"):</b><br>" +
+                errs.map(function(e){ return "• "+e; }).join("<br>");
+      }
+      status.innerHTML = base;
+    })
+    .withFailureHandler(function(err){
+      btn.disabled=false; btn.textContent="LEER PLANILLAS";
+      status.className="planilla-status err";
+      status.textContent="Error: "+(err&&err.message?err.message:err);
+    })
+    .cargarPlanillas();
+}
+
+function renderTeamPicks(equipos){
+  var cont=document.getElementById("planillaTeams");
+  var avail={}; equipos.forEach(function(e){ avail[e.equipoLetra]=true; });
+  cont.innerHTML=["A","B","C","D"].map(function(L){
+    var dis=avail[L]?"":"disabled";
+    return '<button class="team-pick" id="pick'+L+'" '+dis+' onclick="aplicarPlanilla(\''+L+'\')">'+L+'</button>';
+  }).join("");
+}
+
+function aplicarPlanilla(letra){
+  var e = window.__equipos && window.__equipos[letra];
+  if (!e) return;
+  rivalInput.value  = e.rival || "";
+  if (e.fecha)  fechaInput.value  = e.fecha;
+  if (e.camada) camadaInput.value = e.camada;
+  if (e.cancha) canchaInput.value = e.cancha;
+  jugadores = (e.jugadores||[]).map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
+  renderJugadores();
+  planillaSel = { nPartido: e.nPartido || "" };
+  ["A","B","C","D"].forEach(function(L){
+    var b=document.getElementById("pick"+L); if(b) b.classList.toggle("sel", L===letra);
+  });
+  var badge=document.getElementById("planillaBadge");
+  badge.innerHTML = e.nPartido
+    ? '<span class="planilla-badge">CUBA '+letra+' · Partido N° '+e.nPartido+' · '+(e.jugadores||[]).length+' jugadores</span>'
+    : '';
+  checkSetupReady();
+}
+
+[rivalInput, fechaInput, canchaInput, camadaInput].forEach(function(el){
+  el.addEventListener("input", checkSetupReady);
+  el.addEventListener("change", checkSetupReady);
+});
+
+jugNomInput.addEventListener("keydown", function(e){ if(e.key==="Enter") addJugador(); });
+
+function checkSetupReady(){
+  var ready = !!rivalInput.value.trim();
+  var btn = document.getElementById("btnIniciar");
+  btn.style.opacity = ready ? "1" : "0.4";
+}
+
+function addJugador(){
+  var num = jugNumInput.value.trim();
+  var nom = jugNomInput.value.trim();
+  if (!nom) return;
+  jugadores.push({num: num || "?", nom: nom});
+  jugNumInput.value = "";
+  jugNomInput.value = "";
+  jugNomInput.focus();
+  renderJugadores();
+}
+
+function removeJugador(i){
+  jugadores.splice(i,1);
+  renderJugadores();
+}
+
+function renderJugadores(){
+  var list = document.getElementById("jugadorList");
+  if (!jugadores.length){ list.innerHTML = ""; return; }
+  list.innerHTML = jugadores.map(function(j,i){
+    return '<div class="jugador-chip">'
+      + '<div class="num">'+j.num+'</div>'
+      + '<div class="name">'+j.nom+'</div>'
+      + '<button class="del" onclick="removeJugador('+i+')">x</button>'
+      + '</div>';
+  }).join("");
+}
+
+function iniciarPartido(){
+  var rival = rivalInput.value.trim();
+  if (!rival){
+    rivalInput.focus();
+    rivalInput.style.borderColor = "var(--red)";
+    setTimeout(function(){ rivalInput.style.borderColor = ""; }, 2000);
+    return;
+  }
+  var cantT = parseInt(document.getElementById("cantTiemposInput").value) || 2;
+  var durT  = parseInt(document.getElementById("durTiempoInput").value)  || 35;
+  partido = { rival:rival, fecha:fechaInput.value, cancha:canchaInput.value.trim()||"", camada:camadaInput.value.trim()||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"" };
+  document.getElementById("matchVs").textContent       = "CUBA vs "+rival.toUpperCase();
+  document.getElementById("scoreRivalLabel").textContent = rival.toUpperCase();
+  document.getElementById("matchMeta").textContent     = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
+  document.getElementById("headerTitle").textContent   = "CUBA vs "+rival.toUpperCase();
+  buildPeriodoRow(cantT);
+  document.getElementById("progressEnd").textContent   = durT+":00";
+  document.getElementById("progressLabel").textContent = durT+":00 restantes";
+  document.getElementById("progressBar").style.width   = "0%";
+  setTeamTab("CUBA");
+  showScreen("screenMatch");
+  setEventButtonsEnabled(false);
+  if (typeof google !== 'undefined' && google.script){
+    google.script.run.guardarRoster(getPartidoId(), jugadores);
+  }
+}
+
+function buildPeriodoRow(cantT){
+  var periodoRow = document.getElementById("periodoRow");
+  periodoRow.innerHTML = "";
+  var labels = ["1er TIEMPO","2do TIEMPO","3er TIEMPO"];
+  var codes  = ["1T","2T","3T"];
+  for (var i = 0; i < cantT; i++){
+    var pb = document.createElement("button");
+    pb.className = "periodo-btn"+(i===0?" active":"");
+    pb.id = "btn"+(i+1)+"T";
+    pb.textContent = labels[i];
+    (function(code){ pb.addEventListener("click", function(){ setPeriodo(code); }); })(codes[i]);
+    periodoRow.appendChild(pb);
+  }
+}
+
+// ---- TIMER ----
+function toggleTimer(){
+  if (timerInt){
+    clearInterval(timerInt); timerInt = null;
+    document.getElementById("btnStartStop").textContent  = "CONTINUAR";
+    document.getElementById("btnStartStop").className    = "btn-timer btn-start";
+    document.getElementById("timerDisplay").classList.remove("running");
+    setEventButtonsEnabled(false);
+  } else {
+    if (!startTimestamp){
+      startTimestamp = Date.now() - (timerSecs * 1000);
+      if (partido && partido.rival && typeof google !== 'undefined' && google.script){
+        var pid = getPartidoId();
+        if (pid) google.script.run.guardarTimestamp(pid, startTimestamp);
+      }
+    }
+    timerInt = setInterval(function(){ timerSecs++; updateTimerDisplay(); }, 1000);
+    document.getElementById("btnStartStop").textContent  = "DETENER";
+    document.getElementById("btnStartStop").className    = "btn-timer btn-stop";
+    document.getElementById("timerDisplay").classList.add("running");
+    setEventButtonsEnabled(true);
+  }
+}
+
+function resetTimer(){
+  if (!confirm("¿Reiniciar el cronómetro a 00:00? (no borra las incidencias)")) return;
+  clearInterval(timerInt); timerInt = null;
+  timerSecs = 0; startTimestamp = null;
+  updateTimerDisplay();
+  document.getElementById("btnStartStop").textContent = "INICIAR";
+  document.getElementById("btnStartStop").className   = "btn-timer btn-start";
+  document.getElementById("timerDisplay").classList.remove("running");
+  document.getElementById("timerDisplay").classList.remove("overtime");
+  setEventButtonsEnabled(false);
+  var bar = document.getElementById("progressBar");
+  if (bar){ bar.style.width="0%"; bar.className="progress-bar"; }
+  var lbl = document.getElementById("progressLabel");
+  if (lbl && partido && partido.durT){ lbl.textContent = partido.durT+":00 restantes"; lbl.className="progress-label"; }
+}
+
+function updateTimerDisplay(){
+  var m = Math.floor(timerSecs/60);
+  var s = timerSecs % 60;
+  document.getElementById("timerDisplay").textContent = (m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+  updateProgress();
+}
+
+function updateProgress(){
+  if (!partido || !partido.durT) return;
+  var totalSecs = partido.durT * 60;
+  var pct       = Math.min(timerSecs/totalSecs,1)*100;
+  var overtime  = timerSecs > totalSecs;
+  var bar       = document.getElementById("progressBar");
+  var lbl       = document.getElementById("progressLabel");
+  var disp      = document.getElementById("timerDisplay");
+  if (!bar || !lbl) return;
+  bar.style.width = pct+"%";
+  bar.className   = "progress-bar"+(overtime?" overtime":"");
+  var running     = document.getElementById("btnStartStop").textContent==="DETENER";
+  disp.className  = "timer-display"+(overtime?" overtime":(running?" running":""));
+  if (overtime){
+    var over = timerSecs-totalSecs;
+    var om=Math.floor(over/60), os=over%60;
+    lbl.textContent = "+"+(om<10?"0":"")+om+":"+(os<10?"0":"")+os+" excedido";
+    lbl.className   = "progress-label overtime";
+  } else {
+    var rem = totalSecs-timerSecs;
+    var rm=Math.floor(rem/60), rs=rem%60;
+    lbl.textContent = (rm<10?"0":"")+rm+":"+(rs<10?"0":"")+rs+" restantes";
+    lbl.className   = "progress-label";
+  }
+}
+
+function setPeriodo(p){
+  periodo = p;
+  document.querySelectorAll(".periodo-btn").forEach(function(btn){ btn.classList.remove("active"); });
+  var codes=["1T","2T","3T"], ids=["btn1T","btn2T","btn3T"];
+  for (var i=0;i<codes.length;i++){
+    if (codes[i]===p){ var el=document.getElementById(ids[i]); if(el) el.classList.add("active"); }
+  }
+}
+
+// ---- MODAL EVENTO ----
+function openModal(tipo, pts, icon, equipo){
+  modalData = {tipo:tipo, pts:pts, icon:icon, equipo:equipo||"CUBA"};
+  document.getElementById("modalTitle").innerHTML = icon+" &nbsp;"+tipo;
+  var sel = document.getElementById("modalJugSelect");
+  sel.innerHTML = '<option value="">-- Seleccionar --</option>';
+  jugadores.forEach(function(j,i){
+    sel.innerHTML += '<option value="'+i+'">#'+j.num+' '+j.nom+'</option>';
+  });
+  document.getElementById("modalNumInput").value = "";
+  document.getElementById("modalOverlay").classList.add("open");
+}
+
+function closeModal(){
+  document.getElementById("modalOverlay").classList.remove("open");
+  document.activeElement && document.activeElement.blur();
+  setTimeout(function(){ window.scrollTo(0,0); }, 100);
+}
+
+function closeModalOutside(e){
+  if (e.target===document.getElementById("modalOverlay")) closeModal();
+}
+
+function confirmarEvento(){
+  var sel    = document.getElementById("modalJugSelect");
+  var numIn  = document.getElementById("modalNumInput").value.trim();
+  var jugLabel = "";
+  if (sel.value !== ""){
+    var j = jugadores[parseInt(sel.value)];
+    jugLabel = "#"+j.num+" "+j.nom;
+  } else if (numIn){
+    jugLabel = "#"+numIn;
+  } else {
+    jugLabel = "Sin asignar";
+  }
+  var m=Math.floor(timerSecs/60), s=timerSecs%60;
+  var minStr=(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+  eventos.push({ tipo:modalData.tipo, pts:modalData.pts, icon:modalData.icon, jugador:jugLabel, minuto:minStr, periodo:periodo, equipo:modalData.equipo||"CUBA" });
+  closeModal();
+  updateScore();
+  renderHistorial();
+  if (typeof google !== 'undefined' && google.script){
+    google.script.run.guardarEvento(partido, eventos[eventos.length-1]);
+  }
+}
+
+// ---- MODAL CAMBIO ----
+function openCambioModal(){
+  var opts='<option value="">-- Seleccionar --</option>';
+  jugadores.forEach(function(j,i){ opts+='<option value="'+i+'">#'+j.num+' '+j.nom+'</option>'; });
+  document.getElementById("cambioSale").innerHTML  = opts;
+  document.getElementById("cambioEntra").innerHTML = opts;
+  document.getElementById("cambioSaleNum").value  = "";
+  document.getElementById("cambioEntraNum").value = "";
+  document.getElementById("cambioModalOverlay").classList.add("open");
+}
+
+function closeCambioModal(){
+  document.getElementById("cambioModalOverlay").classList.remove("open");
+  document.activeElement && document.activeElement.blur();
+  setTimeout(function(){ window.scrollTo(0,0); }, 100);
+}
+
+function jugLabelFrom_(selId, numId){
+  var sel = document.getElementById(selId).value;
+  var num = document.getElementById(numId).value.trim();
+  if (sel !== ""){ var j=jugadores[parseInt(sel)]; return "#"+j.num+" "+j.nom; }
+  if (num) return "#"+num;
+  return "";
+}
+
+function confirmarCambio(){
+  var sale  = jugLabelFrom_("cambioSale","cambioSaleNum");
+  var entra = jugLabelFrom_("cambioEntra","cambioEntraNum");
+  if (!sale && !entra) return;
+  var label = "Sale "+(sale||"?")+"  ->  Entra "+(entra||"?");
+  var m=Math.floor(timerSecs/60), s=timerSecs%60;
+  var minStr=(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+  eventos.push({ tipo:"Cambio", pts:0, icon:"&#x1F501;", jugador:label, minuto:minStr, periodo:periodo, equipo:"CUBA" });
+  closeCambioModal();
+  updateScore(); renderHistorial();
+  if (typeof google !== 'undefined' && google.script){
+    google.script.run.guardarEvento(partido, eventos[eventos.length-1]);
+  }
+}
+
+// ---- SCORE ----
+function updateScore(){
+  var cuba  = eventos.filter(function(e){ return e.equipo!=="RIVAL"; }).reduce(function(a,e){ return a+(e.pts||0); },0);
+  var rival = eventos.filter(function(e){ return e.equipo==="RIVAL"; }).reduce(function(a,e){ return a+(e.pts||0); },0);
+  document.getElementById("scoreCuba").textContent  = cuba;
+  document.getElementById("scoreRival").textContent = rival;
+  document.getElementById("resumenScore").textContent = cuba+" - "+rival;
+}
+
+// ---- HISTORIAL ----
+function renderHistorial(){
+  var list = document.getElementById("historialList");
+  if (!eventos.length){ list.innerHTML='<div class="empty-msg">Sin eventos registrados</div>'; return; }
+  list.innerHTML = eventos.slice().reverse().map(function(e,revIdx){
+    var realIdx  = eventos.length-1-revIdx;
+    var rivalCls = e.equipo==="RIVAL"?" rival-ev":"";
+    var rivalBadge = e.equipo==="RIVAL"?' <small style="opacity:.6;font-size:10px;">RIVAL</small>':"";
+    return '<div class="histo-item'+rivalCls+'">'
+      +'<span class="histo-min">'+e.periodo+' '+e.minuto+'</span>'
+      +'<span class="histo-icon">'+e.icon+'</span>'
+      +'<div class="histo-info">'
+      +'<div class="histo-tipo">'+e.tipo+rivalBadge+'</div>'
+      +'<div class="histo-jug">'+e.jugador+'</div>'
+      +'</div>'
+      +'<span class="histo-pts'+(e.pts?'':' cero')+'">'+(e.pts?'+'+e.pts+' pts':'---')+'</span>'
+      +'<div class="histo-actions">'
+      +'<button class="histo-btn histo-edit" onclick="editarEvento('+realIdx+')">&#9998;</button>'
+      +'<button class="histo-btn histo-del" onclick="borrarEvento('+realIdx+')">&#10005;</button>'
+      +'</div>'
+      +'</div>';
+  }).join("");
+}
+
+// ---- RESUMEN ----
+function irResumen(){
+  document.getElementById("resumenVs").textContent  = "CUBA vs "+partido.rival.toUpperCase();
+  document.getElementById("resumenMeta").textContent = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
+  updateScore();
+  var tbody = document.getElementById("resumenBody");
+  if (!eventos.length){
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px;">Sin eventos</td></tr>';
+  } else {
+    tbody.innerHTML = eventos.map(function(e){
+      var rivalStyle = e.equipo==="RIVAL"?"color:#f87171;":"";
+      return '<tr style="'+rivalStyle+'">'
+        +'<td class="tag-min">'+e.minuto+'</td>'
+        +'<td class="tag-min">'+e.periodo+'</td>'
+        +'<td class="tag-ev">'+e.icon+' '+e.tipo+'</td>'
+        +'<td class="tag-jug">'+e.jugador+'</td>'
+        +'<td class="tag-pts'+(e.pts?'':' cero')+'">'+(e.pts?'+'+e.pts:'--')+'</td>'
+        +'</tr>';
+    }).join("");
+  }
+  showScreen("screenResumen");
+}
+
+function volverPartido(){ showScreen("screenMatch"); }
+
+// ---- EXPORT ----
+function exportarPDF(){ window.print(); }
+
+function exportarExcel(){
+  var rival      = partido.rival||"Rival";
+  var fecha      = partido.fecha||"";
+  var scoreCuba  = eventos.filter(function(e){ return e.equipo!=="RIVAL"; }).reduce(function(a,e){ return a+(e.pts||0); },0);
+  var scoreRival = eventos.filter(function(e){ return e.equipo==="RIVAL"; }).reduce(function(a,e){ return a+(e.pts||0); },0);
+  var camada     = partido.camada||"";
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<style>body{font-family:Calibri,sans-serif;font-size:11pt;}'
+    +'table{border-collapse:collapse;width:100%;}'
+    +'td,th{padding:6px 10px;border:1px solid #D0DAF0;}'
+    +'.hdr{background:#060E1F;color:#FFFFFF;font-weight:bold;font-size:13pt;}'
+    +'.hdr2{background:#1A4FA0;color:#FFFFFF;font-weight:bold;}'
+    +'.colh{background:#E8EEF8;color:#0C447C;font-weight:bold;font-size:9pt;}'
+    +'.even{background:#F5F8FD;}.odd{background:#FFFFFF;}'
+    +'.pts{font-weight:bold;color:#0A5C32;}'
+    +'.footer{background:#F5F8FD;color:#888;font-style:italic;font-size:9pt;}'
+    +'</style></head><body><table>';
+  html+='<tr><td class="hdr" colspan="2">CUBA RUGBY</td><td class="hdr" colspan="2">FICHA DE PARTIDO</td><td class="hdr" style="text-align:right;">'+fecha+'</td></tr>';
+  html+='<tr><td class="hdr2" colspan="2">CUBA vs '+rival.toUpperCase()+'</td><td class="hdr2">'+camada+'</td><td class="hdr2">Puntaje CUBA</td><td class="hdr2" style="font-size:16pt;text-align:center;">'+scoreCuba+' - '+scoreRival+'</td></tr>';
+  html+='<tr><td colspan="5" style="height:6px;border:none;"></td></tr>';
+  html+='<tr><td class="colh">Minuto</td><td class="colh">Tiempo</td><td class="colh">Evento</td><td class="colh">Jugador</td><td class="colh">Puntos</td></tr>';
+  eventos.forEach(function(e,i){
+    var cls=i%2===0?"odd":"even";
+    var rivalXls=e.equipo==="RIVAL"?" style='color:#991B1B;'":"";
+    html+='<tr class="'+cls+'"'+rivalXls+'><td>'+e.minuto+'</td><td>'+e.periodo+'</td><td>'+e.tipo+'</td><td>'+e.jugador+'</td><td class="'+(e.pts?"pts":"")+'">'+( e.pts?"+"+e.pts:"--")+'</td></tr>';
+  });
+  html+='<tr><td colspan="5" class="footer">Generado por GIWA-IA | Club CUBA Rugby | Temporada '+new Date().getFullYear()+'</td></tr>';
+  html+='</table></body></html>';
+  var blob=new Blob([html],{type:"application/vnd.ms-excel;charset=utf-8"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url; a.download="CUBA_Ficha_vs_"+rival.replace(/[^a-zA-Z0-9]/g,"_")+"_"+fecha+".xls";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ---- TEAM TAB ----
+var activeTeam = "CUBA";
+
+function setTeamTab(team){
+  activeTeam = team;
+  var tabCuba=document.getElementById("tabCuba"), tabRival=document.getElementById("tabRival");
+  tabCuba.classList.toggle("active",team==="CUBA");
+  tabRival.classList.toggle("active",team==="RIVAL");
+  tabCuba.classList.toggle("cuba",team==="CUBA");
+  tabRival.classList.toggle("rival",team==="RIVAL");
+  var isCuba=team==="CUBA";
+  var tryBtn=document.getElementById("btnTry"), tpBtn=document.getElementById("btnTryPenal");
+  var convBtn=document.getElementById("btnConv"), penalBtn=document.getElementById("btnPenal"), dropBtn=document.getElementById("btnDrop");
+  var label=document.getElementById("puntosLabel");
+  if (isCuba){
+    tryBtn.className="btn-event btn-try tab-btn";
+    tpBtn.className="btn-event btn-try-penal tab-btn";
+    convBtn.className="btn-event btn-conv tab-btn";
+    penalBtn.className="btn-event btn-penal tab-btn";
+    dropBtn.className="btn-event btn-drop tab-btn";
+    label.style.color="";
+  } else {
+    var rs="btn-event tab-btn rival-event";
+    tryBtn.className=tpBtn.className=convBtn.className=penalBtn.className=dropBtn.className=rs;
+    label.style.color="var(--red)";
+  }
+}
+
+function onEventBtn(tipo, pts, icon){
+  if (activeTeam==="RIVAL" || tipo==="Try Penal"){
+    var m=Math.floor(timerSecs/60), s=timerSecs%60;
+    var minStr=(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+    var jugLabel=activeTeam==="RIVAL"?(partido.rival||"Rival"):"(penal)";
+    eventos.push({tipo:tipo,pts:pts,icon:icon,jugador:jugLabel,minuto:minStr,periodo:periodo,equipo:activeTeam});
+    updateScore(); renderHistorial();
+    if (typeof google !== 'undefined' && google.script){
+      google.script.run.guardarEvento(partido, eventos[eventos.length-1]);
+    }
+  } else {
+    openModal(tipo, pts, icon, "CUBA");
+  }
+}
+
+// ---- EDIT EVENT ----
+function borrarEvento(idx){
+  var partidoId = getPartidoId();
+  eventos.splice(idx,1);
+  updateScore(); renderHistorial();
+  if (partidoId && typeof google !== 'undefined' && google.script){
+    google.script.run.borrarEventoSheet(partidoId, idx);
+  }
+}
+
+function editarEvento(idx){
+  editingIdx = idx;
+  var e = eventos[idx];
+  document.getElementById("editTipo").value    = e.tipo;
+  document.getElementById("editPts").value     = e.pts;
+  document.getElementById("editMinuto").value  = e.minuto;
+  document.getElementById("editPeriodo").value = e.periodo;
+  document.getElementById("editJugador").value = e.jugador;
+  document.getElementById("editEquipo").value  = e.equipo||"CUBA";
+  document.getElementById("editModalOverlay").classList.add("open");
+}
+
+function closeEditModal(){
+  document.getElementById("editModalOverlay").classList.remove("open");
+  editingIdx = null;
+  document.activeElement && document.activeElement.blur();
+  setTimeout(function(){ window.scrollTo(0,0); }, 100);
+}
+
+function confirmarEdicion(){
+  if (editingIdx===null) return;
+  var tipo=document.getElementById("editTipo").value;
+  var pts=parseInt(document.getElementById("editPts").value)||0;
+  var minuto=document.getElementById("editMinuto").value.trim();
+  var per=document.getElementById("editPeriodo").value;
+  var jugador=document.getElementById("editJugador").value.trim();
+  var equipo=document.getElementById("editEquipo").value;
+  var iconMap={"Try":"&#x1F3C9;","Try Penal":"&#x1F3C9;","Conversion":"&#x1F3AF;","Penal":"&#x1F94A;","Drop":"&#x1F91E;","Tarjeta Amarilla":"&#x1F7E8;","Tarjeta Roja":"&#x1F7E5;","Tarjeta Azul":"&#x1F7E6;","Cambio":"&#x1F501;"};
+  var icon=iconMap[tipo]||eventos[editingIdx].icon;
+  eventos[editingIdx]={tipo:tipo,pts:pts,icon:icon,jugador:jugador,minuto:minuto,periodo:per,equipo:equipo};
+  closeEditModal(); updateScore(); renderHistorial();
+  var partidoId=getPartidoId();
+  if (partidoId && typeof google !== 'undefined' && google.script){
+    google.script.run.editarEventoSheet(partidoId, editingIdx, eventos[editingIdx]);
+  }
+}
+
+// ---- EVENT BUTTONS ENABLE/DISABLE ----
+function setEventButtonsEnabled(enabled){
+  document.querySelectorAll('.btn-event,.btn-card,.btn-cambio').forEach(function(btn){ btn.disabled=!enabled; });
+}
+
+// ---- RECOVERY ----
+var recoveryData = null;
+
+function checkRecovery(){
+  if (typeof google==='undefined'||!google.script) return;
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res||!res.ok||!res.partidos||!res.partidos.length) return;
+      var last=res.partidos[0];
+      recoveryData=last;
+      document.getElementById("recoveryTitle").textContent = "CUBA vs "+last.rival.toUpperCase();
+      document.getElementById("recoverySub").textContent   = (last.fecha||"")+(last.camada?" - "+last.camada:"")+" (sin terminar)";
+      document.getElementById("recoveryBanner").classList.add("visible");
+    })
+    .withFailureHandler(function(){})
+    .getPartidos();
+}
+
+function retomarPartido(){
+  if (!recoveryData) return;
+  var id=recoveryData.id;
+  partido={ rival:recoveryData.rival, fecha:recoveryData.fecha, camada:recoveryData.camada||"", cancha:"", cantT:2, durT:35, nPartido:(/^\d+$/.test(id)?id:"") };
+  if (typeof google==='undefined'||!google.script) return;
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res||!res.ok) return;
+      // Restaurar roster guardado del partido
+      google.script.run
+        .withSuccessHandler(function(r){
+          if (r && r.ok && r.jugadores && r.jugadores.length){
+            jugadores = r.jugadores.map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
+            renderJugadores();
+          }
+        })
+        .withFailureHandler(function(){})
+        .getRoster(id);
+      var iconMap={"Try":"&#x1F3C9;","Try Penal":"&#x1F3C9;","Conversion":"&#x1F3AF;","Penal":"&#x1F94A;","Drop":"&#x1F91E;","Tarjeta Amarilla":"&#x1F7E8;","Tarjeta Roja":"&#x1F7E5;","Tarjeta Azul":"&#x1F7E6;","Cambio":"&#x1F501;"};
+      eventos=(res.eventos||[]).map(function(e){ return {tipo:e.tipo,pts:Number(e.pts)||0,icon:iconMap[e.tipo]||"&#x1F3C9;",jugador:e.jugador,minuto:e.minuto,periodo:e.periodo,equipo:e.equipo||"CUBA"}; });
+      document.getElementById("matchVs").textContent       = "CUBA vs "+partido.rival.toUpperCase();
+      document.getElementById("scoreRivalLabel").textContent = partido.rival.toUpperCase();
+      document.getElementById("matchMeta").textContent     = [partido.fecha,partido.camada].filter(Boolean).join(" | ");
+      document.getElementById("headerTitle").textContent   = "CUBA vs "+partido.rival.toUpperCase();
+      document.getElementById("progressEnd").textContent   = partido.durT+":00";
+      document.getElementById("progressLabel").textContent = partido.durT+":00 restantes";
+      document.getElementById("progressBar").style.width   = "0%";
+      buildPeriodoRow(partido.cantT);
+      setTeamTab("CUBA"); updateScore(); renderHistorial();
+      showScreen("screenMatch");
+      google.script.run
+        .withSuccessHandler(function(ts){
+          if (ts){
+            startTimestamp=ts;
+            timerSecs=Math.max(0,Math.floor((Date.now()-ts)/1000));
+            updateTimerDisplay();
+            timerInt=setInterval(function(){ timerSecs++; updateTimerDisplay(); },1000);
+            document.getElementById("btnStartStop").textContent="DETENER";
+            document.getElementById("btnStartStop").className="btn-timer btn-stop";
+            document.getElementById("timerDisplay").classList.add("running");
+            setEventButtonsEnabled(true);
+          } else { setEventButtonsEnabled(false); }
+        })
+        .withFailureHandler(function(){})
+        .getTimestamp(id);
+    })
+    .withFailureHandler(function(){})
+    .getPartidoEventos(id);
+}
+
+function descartarRecovery(){
+  recoveryData=null;
+  document.getElementById("recoveryBanner").classList.remove("visible");
+}
+
+// ---- PARTIDO ID ----
+function getPartidoId(){
+  if (partido && partido.nPartido) return String(partido.nPartido);
+  if (partido && partido.rival)    return partido.rival.replace(/[^a-zA-Z0-9]/g,'_')+'_'+(partido.fecha||'').substring(0,10);
+  return null;
+}
+
+// ---- NAV ----
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(function(s){ s.classList.remove("active"); });
+  document.getElementById(id).classList.add("active");
+}
+</script>
+</body>
+</html>
