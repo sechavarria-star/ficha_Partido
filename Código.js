@@ -365,33 +365,74 @@ function parsePlanilla_(text) {
   return res;
 }
 
-// Lee todos los PDF de la carpeta, parsea y devuelve los equipos (A..D).
-// Además vuelca el resultado a las hojas Planillas/Rosters.
+// Configura la Edge Function de Supabase (ejecutar UNA vez en el editor con
+// tus valores). Las claves quedan en ScriptProperties, NO en el código/repo.
+function configSupabase(fnUrl, anonKey) {
+  var props = PropertiesService.getScriptProperties();
+  if (fnUrl)   props.setProperty('SUPABASE_FN_URL', fnUrl);
+  if (anonKey) props.setProperty('SUPABASE_ANON_KEY', anonKey);
+  return 'Supabase configurado: ' + (props.getProperty('SUPABASE_FN_URL') || '(sin url)');
+}
+
+// Lee todos los PDF de la carpeta, los parsea y devuelve los equipos (A..D).
+// Camino rápido: Edge Function de Supabase (extrae texto SIN OCR, en paralelo,
+// ~segundos). Si no está configurada, cae al OCR de Drive (lento).
 function cargarPlanillas() {
   try {
+    var props   = PropertiesService.getScriptProperties();
+    var fnUrl   = props.getProperty('SUPABASE_FN_URL');
+    var anon    = props.getProperty('SUPABASE_ANON_KEY');
     var folder  = getCarpetaPlanillas_();
     var files   = folder.getFilesByType(MimeType.PDF);
     var equipos = {};
     var errores = [];
-    var idx     = 0;
-    while (files.hasNext()) {
-      var file = files.next();
-      if (idx > 0) Utilities.sleep(6000); // espaciar OCR (rate limit de Drive)
-      idx++;
-      try {
-        var parsed = parsePlanilla_(pdfToText_(file));
-        if (parsed.equipoLetra && parsed.jugadores.length) {
-          parsed.archivo = file.getName();
-          equipos[parsed.equipoLetra] = parsed;   // última gana si hay duplicados
-        } else {
-          errores.push(file.getName() + ': CUBA=' + (parsed.equipoLetra||'?') +
-                       ' jugadores=' + parsed.jugadores.length +
-                       ' nPartido=' + (parsed.nPartido||'?'));
-        }
-      } catch(e) {
-        errores.push(file.getName() + ': ' + e.message);
+
+    if (fnUrl && anon) {
+      // --- Edge Function (rápido, en paralelo) ---
+      var reqs = [], names = [];
+      while (files.hasNext()) {
+        var f = files.next();
+        names.push(f.getName());
+        reqs.push({
+          url: fnUrl, method: 'post', contentType: 'application/pdf',
+          headers: { 'Authorization': 'Bearer ' + anon, 'apikey': anon },
+          payload: f.getBlob().getBytes(), muteHttpExceptions: true
+        });
+      }
+      var resps = UrlFetchApp.fetchAll(reqs);
+      for (var i = 0; i < resps.length; i++) {
+        try {
+          var parsed = JSON.parse(resps[i].getContentText());
+          if (parsed.equipoLetra && parsed.jugadores && parsed.jugadores.length) {
+            parsed.archivo = names[i];
+            equipos[parsed.equipoLetra] = parsed;
+          } else {
+            errores.push(names[i] + ': CUBA=' + (parsed.equipoLetra||'?') +
+                         ' jug=' + ((parsed.jugadores||[]).length) +
+                         (parsed.error ? ' err=' + parsed.error : ''));
+          }
+        } catch(e) { errores.push(names[i] + ': ' + e.message); }
+      }
+    } else {
+      // --- Fallback OCR de Drive (lento, con espaciado por rate limit) ---
+      var idx = 0;
+      while (files.hasNext()) {
+        var file = files.next();
+        if (idx > 0) Utilities.sleep(6000);
+        idx++;
+        try {
+          var p2 = parsePlanilla_(pdfToText_(file));
+          if (p2.equipoLetra && p2.jugadores.length) {
+            p2.archivo = file.getName();
+            equipos[p2.equipoLetra] = p2;
+          } else {
+            errores.push(file.getName() + ': CUBA=' + (p2.equipoLetra||'?') +
+                         ' jugadores=' + p2.jugadores.length + ' nPartido=' + (p2.nPartido||'?'));
+          }
+        } catch(e) { errores.push(file.getName() + ': ' + e.message); }
       }
     }
+
     var out = [];
     ['A','B','C','D'].forEach(function(L){ if (equipos[L]) out.push(equipos[L]); });
     if (out.length) volcarPlanillas_(out);
