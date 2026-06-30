@@ -212,6 +212,9 @@ input,select,textarea{font-size:16px !important;}
 .btn-pdf{background:#dc2626;color:#fff;}
 .btn-excel{background:#0a8f4a;color:#fff;}
 .btn-volver{width:100%;padding:20px;background:var(--navy-card);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--white);font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;cursor:pointer;margin-top:12px;display:block;}
+.btn-finalizar{width:100%;padding:20px;margin-top:16px;background:var(--green);color:#fff;border:none;border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;cursor:pointer;display:block;}
+.btn-finalizar:disabled{opacity:.5;cursor:default;}
+.btn-finalizar.done{background:var(--navy-card);border:1.5px solid var(--green);color:var(--green);}
 
 /* DISABLED EVENT BUTTONS */
 .btn-event:disabled{opacity:.3;cursor:not-allowed;}
@@ -475,6 +478,8 @@ input,select,textarea{font-size:16px !important;}
     <button class="btn-export btn-pdf" onclick="exportarPDF()">EXPORTAR PDF</button>
     <button class="btn-export btn-excel" onclick="exportarExcel()">EXPORTAR EXCEL</button>
   </div>
+  <button class="btn-finalizar" id="btnFinalizar" onclick="finalizarPartido()">&#10004; FINALIZAR PARTIDO</button>
+  <div id="finalizarStatus" style="text-align:center;font-size:13px;color:var(--muted);margin-top:8px;min-height:16px;"></div>
   <button class="btn-volver" onclick="volverPartido()">&#8592; Volver al partido</button>
 </div></div>
 
@@ -584,7 +589,7 @@ input,select,textarea{font-size:16px !important;}
 <!-- ZOOM SLIDER BAR -->
 <div class="zoom-bar" id="zoomBar">
   <label>ZOOM</label>
-  <input type="range" id="zoomSlider" min="80" max="300" value="100" step="5" oninput="applyZoom(this.value)">
+  <input type="range" id="zoomSlider" min="60" max="160" value="100" step="5" oninput="applyZoom(this.value)">
   <span class="zoom-val" id="zoomVal">100%</span>
   <button class="zoom-close" onclick="toggleZoomBar()" title="Ocultar">&#10005;</button>
 </div>
@@ -595,7 +600,7 @@ input,select,textarea{font-size:16px !important;}
 var zoomLevel = 100;
 
 function applyZoom(val) {
-  zoomLevel = parseInt(val);
+  zoomLevel = Math.max(60, Math.min(160, parseInt(val) || 100));
   document.body.style.zoom = (zoomLevel / 100);
   document.getElementById('zoomVal').textContent = zoomLevel + '%';
   try { localStorage.setItem('ficha_zoom', zoomLevel); } catch(e){}
@@ -613,15 +618,7 @@ function toggleZoomBar() {
 (function(){
   try {
     var saved = localStorage.getItem('ficha_zoom');
-    if (saved) {
-      var val = parseInt(saved);
-      zoomLevel = val;
-      document.body.style.zoom = val / 100;
-      var sl = document.getElementById('zoomSlider');
-      var lbl = document.getElementById('zoomVal');
-      if (sl) sl.value = val;
-      if (lbl) lbl.textContent = val + '%';
-    }
+    if (saved) applyZoom(parseInt(saved));
   } catch(e){}
 })();
 
@@ -1021,6 +1018,9 @@ function renderHistorial(){
 
 // ---- RESUMEN ----
 function irResumen(){
+  var fb=document.getElementById("btnFinalizar");
+  fb.disabled=false; fb.classList.remove("done"); fb.innerHTML="&#10004; FINALIZAR PARTIDO";
+  document.getElementById("finalizarStatus").textContent="";
   document.getElementById("resumenVs").textContent  = "CUBA vs "+partido.rival.toUpperCase();
   document.getElementById("resumenMeta").textContent = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
   updateScore();
@@ -1043,6 +1043,27 @@ function irResumen(){
 }
 
 function volverPartido(){ showScreen("screenMatch"); }
+
+function finalizarPartido(){
+  var id = getPartidoId();
+  var btn = document.getElementById("btnFinalizar");
+  var st  = document.getElementById("finalizarStatus");
+  if (!id){ st.textContent="No hay partido para finalizar."; return; }
+  if (!confirm("¿Finalizar el partido? Queda registrado como finalizado en la base.")) return;
+  btn.disabled=true; st.textContent="Finalizando…";
+  // Aseguro que el estado final (eventos) esté sincronizado, después marco finalizado.
+  sbApi("syncEventos", { partido: partido, eventos: eventos })
+    .then(function(){ return sbApi("finalizarPartido", { nPartido: id }); })
+    .then(function(res){
+      if (res && res.ok){
+        btn.classList.add("done"); btn.innerHTML="&#10004; PARTIDO FINALIZADO";
+        st.textContent="Guardado como finalizado.";
+      } else {
+        btn.disabled=false; st.textContent="Error: "+((res&&res.error)||"sin respuesta");
+      }
+    })
+    .catch(function(err){ btn.disabled=false; st.textContent="Error: "+(err&&err.message?err.message:err); });
+}
 
 // ---- EXPORT ----
 function exportarPDF(){ window.print(); }
