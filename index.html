@@ -665,6 +665,7 @@ function sbParse(file){
 
 fechaInput.value = new Date().toISOString().split("T")[0];
 checkRecovery();
+cargarPlanillasDeFecha(fechaInput.value);   // al abrir: planillas de hoy
 
 // ---- PLANILLAS (subir PDF -> parsear+guardar en Supabase) ----
 function onPdfsSeleccionados(files){
@@ -704,6 +705,29 @@ function onPdfsSeleccionados(files){
   });
 }
 
+function fmtFecha(f){ var p=String(f).split("-"); return p.length===3 ? (p[2]+"/"+p[1]) : f; }
+
+// Al abrir (y al cambiar la fecha): trae de la base las planillas ya cargadas
+// para esa fecha y muestra los equipos A/B/C/D disponibles.
+function cargarPlanillasDeFecha(fecha){
+  var status = document.getElementById("planillaStatus");
+  if (!fecha) return;
+  status.className="planilla-status"; status.textContent="Buscando planillas del "+fmtFecha(fecha)+"…";
+  sbApi("getPlanillasFecha", { fecha: fecha }).then(function(res){
+    window.__equipos = {};
+    var equipos = (res && res.equipos) ? res.equipos : [];
+    equipos.forEach(function(e){ window.__equipos[e.equipoLetra]=e; });
+    renderTeamPicks(equipos);
+    var n=equipos.length;
+    status.className="planilla-status "+(n?"ok":"");
+    status.innerHTML = n
+      ? ("Planillas del "+fmtFecha(fecha)+": "+n+" equipo(s) ["+equipos.map(function(e){return e.equipoLetra;}).join(", ")+"]. Elegí el equipo.")
+      : ("No hay planillas para el "+fmtFecha(fecha)+". Subí las PDF o cambiá la fecha.");
+  }).catch(function(err){
+    status.className="planilla-status err"; status.textContent="Error al buscar planillas: "+(err&&err.message?err.message:err);
+  });
+}
+
 function renderTeamPicks(equipos){
   var cont=document.getElementById("planillaTeams");
   var avail={}; equipos.forEach(function(e){ avail[e.equipoLetra]=true; });
@@ -737,6 +761,9 @@ function aplicarPlanilla(letra){
   el.addEventListener("input", checkSetupReady);
   el.addEventListener("change", checkSetupReady);
 });
+
+// Cambiar la fecha manualmente recarga las planillas de ese día.
+fechaInput.addEventListener("change", function(){ cargarPlanillasDeFecha(fechaInput.value); });
 
 jugNomInput.addEventListener("keydown", function(e){ if(e.key==="Enter") addJugador(); });
 
