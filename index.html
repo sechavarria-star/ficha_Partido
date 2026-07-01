@@ -30,6 +30,8 @@ input,select,textarea{font-size:16px !important;}
 .header-row{display:flex;align-items:center;gap:10px;}
 .header-tag{font-size:11px;letter-spacing:3px;color:#7aaee8;text-transform:uppercase;}
 .header-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--white);line-height:1;}
+.header-meta{font-size:13px;color:var(--muted);margin-top:3px;}
+.header-meta:empty{display:none;}
 
 /* SCREENS */
 .screen{display:none;}
@@ -260,6 +262,7 @@ input,select,textarea{font-size:16px !important;}
     <div>
       <div class="header-tag">CUBA Rugby</div>
       <div class="header-title" id="headerTitle">Ficha de Partido</div>
+      <div class="header-meta" id="headerMeta"></div>
     </div>
   </div>
 </header>
@@ -342,11 +345,6 @@ input,select,textarea{font-size:16px !important;}
 
 <!-- MATCH -->
 <div class="screen" id="screenMatch"><div class="match-wrap">
-
-  <div class="match-header">
-    <div class="match-vs" id="matchVs">CUBA vs RIVAL</div>
-    <div class="match-meta" id="matchMeta"></div>
-  </div>
 
   <!-- Score -->
   <div class="score-wrap">
@@ -812,10 +810,9 @@ function iniciarPartido(){
   var cantT = parseInt(document.getElementById("cantTiemposInput").value) || 2;
   var durT  = parseInt(document.getElementById("durTiempoInput").value)  || 35;
   partido = { rival:rival, fecha:fechaInput.value, cancha:canchaInput.value.trim()||"", camada:camadaInput.value.trim()||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"" };
-  document.getElementById("matchVs").textContent       = "CUBA vs "+rival.toUpperCase();
   document.getElementById("scoreRivalLabel").textContent = rival.toUpperCase();
-  document.getElementById("matchMeta").textContent     = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
   document.getElementById("headerTitle").textContent   = "CUBA vs "+rival.toUpperCase();
+  document.getElementById("headerMeta").textContent    = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
   buildPeriodoRow(cantT);
   document.getElementById("progressEnd").textContent   = durT+":00";
   document.getElementById("progressLabel").textContent = durT+":00 restantes";
@@ -1252,10 +1249,9 @@ function retomarPartido(){
     }
     var iconMap={"Try":"&#x1F3C9;","Try Penal":"&#x1F3C9;","Conversion":"&#x1F3AF;","Penal":"&#x1F94A;","Drop":"&#x1F91E;","Tarjeta Amarilla":"&#x1F7E8;","Tarjeta Roja":"&#x1F7E5;","Tarjeta Azul":"&#x1F7E6;","Cambio":"&#x1F501;"};
     eventos=(res.eventos||[]).map(function(e){ return {tipo:e.tipo,pts:Number(e.pts)||0,icon:iconMap[e.tipo]||"&#x1F3C9;",jugador:e.jugador,minuto:e.minuto,periodo:e.periodo,equipo:e.equipo||"CUBA"}; });
-    document.getElementById("matchVs").textContent       = "CUBA vs "+partido.rival.toUpperCase();
     document.getElementById("scoreRivalLabel").textContent = partido.rival.toUpperCase();
-    document.getElementById("matchMeta").textContent     = [partido.fecha,partido.camada].filter(Boolean).join(" | ");
     document.getElementById("headerTitle").textContent   = "CUBA vs "+partido.rival.toUpperCase();
+    document.getElementById("headerMeta").textContent    = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
     document.getElementById("progressEnd").textContent   = partido.durT+":00";
     document.getElementById("progressLabel").textContent = partido.durT+":00 restantes";
     document.getElementById("progressBar").style.width   = "0%";
