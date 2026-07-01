@@ -33,6 +33,18 @@ input,select,textarea{font-size:16px !important;}
 .header-meta{font-size:13px;color:var(--muted);margin-top:3px;}
 .header-meta:empty{display:none;}
 
+/* CONFIRM MODAL */
+.confirm-modal{max-width:380px;width:100%;text-align:center;padding:28px 22px 22px;border:1.5px solid var(--blue);box-shadow:0 20px 60px rgba(0,0,0,.5);animation:confirmPop .18s ease-out;}
+@keyframes confirmPop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.confirm-icon{font-size:46px;line-height:1;margin-bottom:12px;}
+.confirm-msg{font-size:18px;color:var(--white);line-height:1.45;margin-bottom:24px;font-weight:500;}
+.confirm-btns{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.btn-confirm-no,.btn-confirm-si{padding:18px;border:none;border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;cursor:pointer;transition:filter .15s,transform .05s;}
+.btn-confirm-no{background:var(--navy-mid);color:var(--muted);border:1.5px solid var(--border);}
+.btn-confirm-si{background:linear-gradient(135deg,var(--blue) 0%,var(--blue-light) 100%);color:#fff;}
+.btn-confirm-no:active,.btn-confirm-si:active{transform:scale(.97);}
+.btn-confirm-si:hover{filter:brightness(1.1);}
+
 /* SCREENS */
 .screen{display:none;}
 .screen.active{display:block;}
@@ -584,6 +596,18 @@ input,select,textarea{font-size:16px !important;}
   </div>
 </div>
 
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal confirm-modal">
+    <div class="confirm-icon" id="confirmIcon">&#9888;&#65039;</div>
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="confirm-btns">
+      <button class="btn-confirm-no" id="confirmCancel">Cancelar</button>
+      <button class="btn-confirm-si" id="confirmOk">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ZOOM SLIDER BAR -->
 <div class="zoom-bar" id="zoomBar">
   <label>ZOOM</label>
@@ -841,13 +865,30 @@ function buildPeriodoRow(cantT){
 }
 
 // ---- TIMER ----
+// ---- CONFIRM MODAL (lindo, reemplaza al confirm() del navegador) ----
+var _confirmCb = null;
+function mostrarConfirm(mensaje, onConfirm, icon){
+  _confirmCb = onConfirm || null;
+  document.getElementById("confirmMsg").textContent = mensaje;
+  document.getElementById("confirmIcon").innerHTML = icon || "&#9888;&#65039;";
+  document.getElementById("confirmOverlay").classList.add("open");
+}
+function _confirmClose(){ document.getElementById("confirmOverlay").classList.remove("open"); _confirmCb=null; }
+document.getElementById("confirmOk").addEventListener("click", function(){ var cb=_confirmCb; _confirmClose(); if(cb) cb(); });
+document.getElementById("confirmCancel").addEventListener("click", _confirmClose);
+document.getElementById("confirmOverlay").addEventListener("click", function(e){ if(e.target===this) _confirmClose(); });
+
+function detenerTimer(){
+  clearInterval(timerInt); timerInt = null;
+  document.getElementById("btnStartStop").textContent  = "CONTINUAR";
+  document.getElementById("btnStartStop").className    = "btn-timer btn-start";
+  document.getElementById("timerDisplay").classList.remove("running");
+  setEventButtonsEnabled(false);
+}
+
 function toggleTimer(){
   if (timerInt){
-    clearInterval(timerInt); timerInt = null;
-    document.getElementById("btnStartStop").textContent  = "CONTINUAR";
-    document.getElementById("btnStartStop").className    = "btn-timer btn-start";
-    document.getElementById("timerDisplay").classList.remove("running");
-    setEventButtonsEnabled(false);
+    mostrarConfirm("¿Detener el cronómetro?", detenerTimer, "&#9208;&#65039;");
   } else {
     if (!startTimestamp){
       startTimestamp = Date.now() - (timerSecs * 1000);
@@ -865,19 +906,20 @@ function toggleTimer(){
 }
 
 function resetTimer(){
-  if (!confirm("¿Reiniciar el cronómetro a 00:00? (no borra las incidencias)")) return;
-  clearInterval(timerInt); timerInt = null;
-  timerSecs = 0; startTimestamp = null;
-  updateTimerDisplay();
-  document.getElementById("btnStartStop").textContent = "INICIAR";
-  document.getElementById("btnStartStop").className   = "btn-timer btn-start";
-  document.getElementById("timerDisplay").classList.remove("running");
-  document.getElementById("timerDisplay").classList.remove("overtime");
-  setEventButtonsEnabled(false);
-  var bar = document.getElementById("progressBar");
-  if (bar){ bar.style.width="0%"; bar.className="progress-bar"; }
-  var lbl = document.getElementById("progressLabel");
-  if (lbl && partido && partido.durT){ lbl.textContent = partido.durT+":00 restantes"; lbl.className="progress-label"; }
+  mostrarConfirm("¿Reiniciar el cronómetro a 00:00? (no borra las incidencias)", function(){
+    clearInterval(timerInt); timerInt = null;
+    timerSecs = 0; startTimestamp = null;
+    updateTimerDisplay();
+    document.getElementById("btnStartStop").textContent = "INICIAR";
+    document.getElementById("btnStartStop").className   = "btn-timer btn-start";
+    document.getElementById("timerDisplay").classList.remove("running");
+    document.getElementById("timerDisplay").classList.remove("overtime");
+    setEventButtonsEnabled(false);
+    var bar = document.getElementById("progressBar");
+    if (bar){ bar.style.width="0%"; bar.className="progress-bar"; }
+    var lbl = document.getElementById("progressLabel");
+    if (lbl && partido && partido.durT){ lbl.textContent = partido.durT+":00 restantes"; lbl.className="progress-label"; }
+  }, "&#128260;");
 }
 
 function updateTimerDisplay(){
@@ -1074,20 +1116,21 @@ function finalizarPartido(){
   var btn = document.getElementById("btnFinalizar");
   var st  = document.getElementById("finalizarStatus");
   if (!id){ st.textContent="No hay partido para finalizar."; return; }
-  if (!confirm("¿Finalizar el partido? Queda registrado como finalizado en la base.")) return;
-  btn.disabled=true; st.textContent="Finalizando…";
-  // Aseguro que el estado final (eventos) esté sincronizado, después marco finalizado.
-  sbApi("syncEventos", { partido: partido, eventos: eventos })
-    .then(function(){ return sbApi("finalizarPartido", { nPartido: id }); })
-    .then(function(res){
-      if (res && res.ok){
-        btn.classList.add("done"); btn.innerHTML="&#10004; PARTIDO FINALIZADO";
-        st.textContent="Guardado como finalizado.";
-      } else {
-        btn.disabled=false; st.textContent="Error: "+((res&&res.error)||"sin respuesta");
-      }
-    })
-    .catch(function(err){ btn.disabled=false; st.textContent="Error: "+(err&&err.message?err.message:err); });
+  mostrarConfirm("¿Finalizar el partido? Queda registrado como finalizado en la base.", function(){
+    btn.disabled=true; st.textContent="Finalizando…";
+    // Aseguro que el estado final (eventos) esté sincronizado, después marco finalizado.
+    sbApi("syncEventos", { partido: partido, eventos: eventos })
+      .then(function(){ return sbApi("finalizarPartido", { nPartido: id }); })
+      .then(function(res){
+        if (res && res.ok){
+          btn.classList.add("done"); btn.innerHTML="&#10004; PARTIDO FINALIZADO";
+          st.textContent="Guardado como finalizado.";
+        } else {
+          btn.disabled=false; st.textContent="Error: "+((res&&res.error)||"sin respuesta");
+        }
+      })
+      .catch(function(err){ btn.disabled=false; st.textContent="Error: "+(err&&err.message?err.message:err); });
+  }, "&#127937;");
 }
 
 // ---- EXPORT ----
