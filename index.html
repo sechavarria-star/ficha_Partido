@@ -283,7 +283,7 @@ input,select,textarea{font-size:16px !important;}
   <div class="planilla-card" id="planillaCard">
     <div class="planilla-title">Autocompletar desde planilla</div>
     <div class="planilla-sub">
-      Subí las planillas PDF de URBA (podés seleccionar las 4 juntas) para cargar el partido y el plantel.
+      Subí una o varias planillas PDF de URBA (podés cargar de a una o las 4 juntas). Se van sumando: cada equipo cargado queda disponible en A/B/C/D.
     </div>
     <input id="pdfInput" type="file" accept="application/pdf" multiple style="display:none" onchange="onPdfsSeleccionados(this.files)" />
     <button class="btn-cargar" id="btnCargarPlanillas" onclick="document.getElementById('pdfInput').click()">SUBIR PLANILLAS PDF</button>
@@ -679,12 +679,12 @@ function onPdfsSeleccionados(files){
                      .catch(function(err){ return {name:f.name, res:{error:String(err)}}; });
   })).then(function(results){
     btn.disabled=false; btn.textContent="SUBIR PLANILLAS PDF";
-    window.__equipos = {};
-    var errs=[];
+    window.__equipos = window.__equipos || {};   // acumula: se puede subir de a una
+    var errs=[], nuevos=0;
     results.forEach(function(r){
       var p=r.res;
       if (p && p.equipoLetra && p.jugadores && p.jugadores.length){
-        p.archivo=r.name; window.__equipos[p.equipoLetra]=p;
+        p.archivo=r.name; window.__equipos[p.equipoLetra]=p; nuevos++;
         if (p.saved===false) errs.push(r.name+": parseó pero NO guardó"+(p.saveError?" ("+p.saveError+")":""));
       } else {
         errs.push(r.name+": "+((p&&p.error)||"no reconocida"));
@@ -694,7 +694,8 @@ function onPdfsSeleccionados(files){
     renderTeamPicks(equipos);
     var n=equipos.length;
     status.className="planilla-status "+(n?"ok":"err");
-    var base = n ? ("Listo: "+n+" planilla(s). Elegí el equipo.") : "No se reconoció ninguna planilla.";
+    var base = nuevos ? ("Cargada"+(nuevos>1?"s":"")+" "+nuevos+" — total "+n+" equipo(s) ["+equipos.map(function(e){return e.equipoLetra;}).join(", ")+"]. Elegí el equipo.")
+                      : "No se reconoció ninguna planilla.";
     if (errs.length){
       base += "<br><br><b>Detalle ("+errs.length+"):</b><br>" + errs.map(function(e){ return "• "+e; }).join("<br>");
     }
