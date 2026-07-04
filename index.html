@@ -83,7 +83,7 @@ input,select,textarea{font-size:16px !important;}
 .planilla-status.err{color:#f87171;}
 .planilla-status.ok{color:#4ade80;}
 .planilla-datelabel{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:4px 0 8px;}
-.cal{background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px;margin-bottom:12px;max-width:320px;}
+.cal{background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px;width:100%;}
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
 .cal-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;color:var(--white);}
 .cal-nav{background:none;border:none;color:#7aaee8;font-size:20px;cursor:pointer;padding:0 8px;line-height:1;}
@@ -96,6 +96,13 @@ input,select,textarea{font-size:16px !important;}
 .cal-cell.today{outline:1.5px solid var(--muted);outline-offset:-1.5px;}
 .cal-cell.sel{background:var(--blue);color:#fff;font-weight:700;}
 .cal-cell.sel::after{background:#fff;}
+.cal-row{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:6px;}
+.cal-left{flex:1 1 0;min-width:220px;}
+.cal-right{flex:1 1 0;min-width:200px;}
+.cal-right .field-group{margin-bottom:10px;}
+.cal-right .field-group:last-child{margin-bottom:0;}
+.cal-right .field-label{font-size:13px;margin-bottom:4px;}
+.cal-right .field-input{padding:12px 14px;font-size:18px;}
 .planilla-teams{display:flex;flex-direction:column;gap:8px;}
 .planilla-teams:empty{display:none;}
 .team-pick{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 14px;background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--white);cursor:pointer;}
@@ -319,8 +326,29 @@ input,select,textarea{font-size:16px !important;}
 
   <div class="planilla-card" id="planillaCard">
     <div class="planilla-title">Autocompletar desde planilla</div>
-    <div class="planilla-datelabel">Ver partidos del día</div>
-    <div class="cal" id="cal"></div>
+    <div class="cal-row">
+      <div class="cal-left">
+        <div class="planilla-datelabel">Ver partidos del día</div>
+        <div class="cal" id="cal"></div>
+      </div>
+      <div class="cal-right">
+        <div class="field-group">
+          <div class="field-label">Rival</div>
+          <input class="field-input" id="rivalInput" type="text" inputmode="text" placeholder="Nombre del rival" autocomplete="off" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">Cantidad de tiempos</div>
+          <select class="field-input" id="cantTiemposInput">
+            <option value="2">2 tiempos</option>
+            <option value="3">3 tiempos</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Duracion por tiempo (min)</div>
+          <input class="field-input" id="durTiempoInput" type="number" min="1" max="60" value="35" placeholder="35" />
+        </div>
+      </div>
+    </div>
     <div class="planilla-teams" id="planillaTeams"></div>
     <div class="planilla-status" id="planillaStatus"></div>
     <div class="planilla-sub" style="margin-top:14px;">
@@ -331,21 +359,6 @@ input,select,textarea{font-size:16px !important;}
     <div id="planillaBadge"></div>
   </div>
 
-  <div class="field-group">
-    <div class="field-label">Rival</div>
-    <input class="field-input" id="rivalInput" type="text" inputmode="text" placeholder="Nombre del rival" autocomplete="off" />
-  </div>
-  <div class="field-group">
-    <div class="field-label">Cantidad de tiempos</div>
-    <select class="field-input" id="cantTiemposInput">
-      <option value="2">2 tiempos</option>
-      <option value="3">3 tiempos</option>
-    </select>
-  </div>
-  <div class="field-group">
-    <div class="field-label">Duracion por tiempo (min)</div>
-    <input class="field-input" id="durTiempoInput" type="number" min="1" max="60" value="35" placeholder="35" />
-  </div>
   <div class="section-title">Jugadores CUBA</div>
   <div class="jugador-add">
     <input id="jugNumInput" type="text" inputmode="numeric" placeholder="#" style="max-width:64px;" autocomplete="off" />
