@@ -107,6 +107,10 @@ input,select,textarea{font-size:16px !important;}
 .score-wrap{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 14px;margin-bottom:8px;}
 .score-team{font-size:18px;color:var(--muted);text-align:center;font-weight:600;}
 .score-num{font-family:'Bebas Neue',sans-serif;font-size:86px;color:var(--white);text-align:center;line-height:1;}
+.score-cell{position:relative;}
+.score-tries{font-size:13px;color:var(--muted);text-align:center;font-weight:600;margin-top:4px;letter-spacing:.5px;}
+.bonus-badge{position:absolute;top:-4px;right:4px;display:none;background:var(--amber);color:#241500;font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1;letter-spacing:.5px;padding:4px 8px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.35);}
+.bonus-badge.show{display:inline-block;}
 .score-sep{font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--border);}
 
 .timer-wrap{background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:6px;text-align:center;}
@@ -360,14 +364,18 @@ input,select,textarea{font-size:16px !important;}
 
   <!-- Score -->
   <div class="score-wrap">
-    <div>
+    <div class="score-cell">
+      <span class="bonus-badge" id="bonusCuba"></span>
       <div class="score-team">CUBA</div>
       <div class="score-num" id="scoreCuba">0</div>
+      <div class="score-tries" id="triesCuba">0 tries</div>
     </div>
     <div class="score-sep">-</div>
-    <div>
+    <div class="score-cell">
+      <span class="bonus-badge" id="bonusRival"></span>
       <div class="score-team" id="scoreRivalLabel">RIVAL</div>
       <div class="score-num" id="scoreRival" style="color:#f87171;">0</div>
+      <div class="score-tries" id="triesRival">0 tries</div>
     </div>
   </div>
 
@@ -1057,6 +1065,29 @@ function updateScore(){
   document.getElementById("scoreCuba").textContent  = cuba;
   document.getElementById("scoreRival").textContent = rival;
   document.getElementById("resumenScore").textContent = cuba+" - "+rival;
+
+  // Tries por equipo
+  function esTry(e){ return e.tipo==="Try" || e.tipo==="Try Penal"; }
+  var triesCuba  = eventos.filter(function(e){ return e.equipo!=="RIVAL" && esTry(e); }).length;
+  var triesRival = eventos.filter(function(e){ return e.equipo==="RIVAL" && esTry(e); }).length;
+  document.getElementById("triesCuba").textContent  = triesCuba  + (triesCuba===1?" try":" tries");
+  document.getElementById("triesRival").textContent = triesRival + (triesRival===1?" try":" tries");
+
+  // Punto bonus por equipo: ofensivo (3+ tries de diferencia) + defensivo (pierde por <=7)
+  var bonusCuba = 0, bonusRival = 0;
+  if (triesCuba - triesRival >= 3) bonusCuba++;
+  if (triesRival - triesCuba >= 3) bonusRival++;
+  if (cuba < rival && (rival - cuba) <= 7) bonusCuba++;    // CUBA perdió por <=7
+  if (rival < cuba && (cuba - rival) <= 7) bonusRival++;   // RIVAL perdió por <=7
+  pintarBonus("bonusCuba", bonusCuba);
+  pintarBonus("bonusRival", bonusRival);
+}
+
+function pintarBonus(id, n){
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (n > 0){ el.textContent = n > 1 ? ("B×"+n) : "B"; el.classList.add("show"); el.title = "Punto bonus"; }
+  else { el.textContent = ""; el.classList.remove("show"); }
 }
 
 // ---- HISTORIAL ----
