@@ -336,10 +336,6 @@ input,select,textarea{font-size:16px !important;}
     <input class="field-input" id="rivalInput" type="text" inputmode="text" placeholder="Nombre del rival" autocomplete="off" />
   </div>
   <div class="field-group">
-    <div class="field-label">Fecha</div>
-    <input class="field-input" id="fechaInput" type="date" />
-  </div>
-  <div class="field-group">
     <div class="field-label">Cancha</div>
     <select class="field-input" id="canchaInput">
       <option value="">-- Seleccionar --</option>
@@ -687,7 +683,6 @@ var calYear, calMonth, fechaSel = "", fechasConPartidos = {};   // calendario
 
 // ---- SETUP ----
 var rivalInput  = document.getElementById("rivalInput");
-var fechaInput  = document.getElementById("fechaInput");
 var canchaInput = document.getElementById("canchaInput");
 var camadaInput = document.getElementById("camadaInput");
 var jugNumInput = document.getElementById("jugNumInput");
@@ -714,9 +709,8 @@ function sbParse(file){
   }).then(function(r){ return r.json(); });
 }
 
-fechaInput.value = new Date().toISOString().split("T")[0];
 checkRecovery();
-(function(){ var h=new Date(); calYear=h.getFullYear(); calMonth=h.getMonth(); fechaSel=fechaInput.value; })();
+(function(){ var h=new Date(); calYear=h.getFullYear(); calMonth=h.getMonth(); fechaSel=_ymd(h.getFullYear(),h.getMonth(),h.getDate()); })();
 cargarFechasConPartidos();               // marca en el calendario los días con partidos
 cargarPlanillasDeFecha(fechaSel);        // al abrir: partidos de hoy
 
@@ -847,7 +841,7 @@ function aplicarPlanilla(letra){
   var e = window.__equipos && window.__equipos[letra];
   if (!e) return;
   rivalInput.value  = e.rival || "";
-  if (e.fecha)  fechaInput.value  = e.fecha;
+  if (e.fecha)  fechaSel = e.fecha;
   if (e.camada) camadaInput.value = e.camada;
   if (e.cancha) canchaInput.value = e.cancha;
   jugadores = (e.jugadores||[]).map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
@@ -863,7 +857,7 @@ function aplicarPlanilla(letra){
   checkSetupReady();
 }
 
-[rivalInput, fechaInput, canchaInput, camadaInput].forEach(function(el){
+[rivalInput, canchaInput, camadaInput].forEach(function(el){
   el.addEventListener("input", checkSetupReady);
   el.addEventListener("change", checkSetupReady);
 });
@@ -917,7 +911,7 @@ function iniciarPartido(){
   }
   var cantT = parseInt(document.getElementById("cantTiemposInput").value) || 2;
   var durT  = parseInt(document.getElementById("durTiempoInput").value)  || 35;
-  partido = { rival:rival, fecha:fechaInput.value, cancha:canchaInput.value.trim()||"", camada:camadaInput.value.trim()||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"" };
+  partido = { rival:rival, fecha:fechaSel, cancha:canchaInput.value.trim()||"", camada:camadaInput.value.trim()||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"" };
   document.getElementById("scoreRivalLabel").textContent = rival.toUpperCase();
   document.getElementById("headerTitle").textContent   = "CUBA vs "+rival.toUpperCase();
   document.getElementById("headerMeta").textContent    = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
