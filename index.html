@@ -82,11 +82,19 @@ input,select,textarea{font-size:16px !important;}
 .planilla-status{font-size:13px;color:var(--muted);margin-top:10px;min-height:0;}
 .planilla-status.err{color:#f87171;}
 .planilla-status.ok{color:#4ade80;}
-.planilla-teams{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;}
+.planilla-datefield{margin:4px 0 12px;}
+.planilla-datefield label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.planilla-datefield input{width:100%;padding:14px;background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--white);font-size:16px !important;font-family:'DM Sans',sans-serif;outline:none;}
+.planilla-datefield input:focus{border-color:var(--blue-light);}
+.planilla-teams{display:flex;flex-direction:column;gap:8px;}
 .planilla-teams:empty{display:none;}
-.team-pick{padding:16px 0;background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;cursor:pointer;}
-.team-pick:disabled{opacity:.3;cursor:not-allowed;}
-.team-pick.sel{background:var(--blue);color:#fff;border-color:var(--blue-light);}
+.team-pick{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 14px;background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--white);cursor:pointer;}
+.team-pick .tc-letra{width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--blue);border-radius:50%;font-family:'Bebas Neue',sans-serif;font-size:24px;color:#fff;}
+.team-pick .tc-info{display:flex;flex-direction:column;line-height:1.3;}
+.team-pick .tc-info b{font-size:17px;font-weight:600;}
+.team-pick .tc-info small{font-size:13px;color:var(--muted);}
+.team-pick.sel{background:rgba(46,111,212,.18);border-color:var(--blue-light);}
+.team-pick.sel .tc-letra{background:var(--blue-light);}
 .planilla-badge{display:inline-block;margin-top:10px;padding:4px 10px;background:rgba(46,111,212,.18);border:1px solid var(--blue-light);border-radius:14px;font-size:13px;color:#93c5fd;}
 
 /* RECOVERY BANNER */
@@ -301,13 +309,17 @@ input,select,textarea{font-size:16px !important;}
 
   <div class="planilla-card" id="planillaCard">
     <div class="planilla-title">Autocompletar desde planilla</div>
-    <div class="planilla-sub">
-      Subí una o varias planillas PDF de URBA (podés cargar de a una o las 4 juntas). Se van sumando: cada equipo cargado queda disponible en A/B/C/D.
+    <div class="planilla-datefield">
+      <label for="fechaPlanillas">Ver partidos del día</label>
+      <input type="date" id="fechaPlanillas" onchange="cargarPlanillasDeFecha(this.value)" />
+    </div>
+    <div class="planilla-teams" id="planillaTeams"></div>
+    <div class="planilla-status" id="planillaStatus"></div>
+    <div class="planilla-sub" style="margin-top:14px;">
+      ¿Falta alguna? Subí las planillas PDF de URBA (de a una o varias) y se agregan al día del partido.
     </div>
     <input id="pdfInput" type="file" accept="application/pdf" multiple style="display:none" onchange="onPdfsSeleccionados(this.files)" />
     <button class="btn-cargar" id="btnCargarPlanillas" onclick="document.getElementById('pdfInput').click()">SUBIR PLANILLAS PDF</button>
-    <div class="planilla-status" id="planillaStatus"></div>
-    <div class="planilla-teams" id="planillaTeams"></div>
     <div id="planillaBadge"></div>
   </div>
 
@@ -695,7 +707,8 @@ function sbParse(file){
 
 fechaInput.value = new Date().toISOString().split("T")[0];
 checkRecovery();
-cargarPlanillasDeFecha(fechaInput.value);   // al abrir: planillas de hoy
+document.getElementById("fechaPlanillas").value = fechaInput.value;   // hoy
+cargarPlanillasDeFecha(fechaInput.value);                             // al abrir: partidos de hoy
 
 // ---- PLANILLAS (subir PDF -> parsear+guardar en Supabase) ----
 function onPdfsSeleccionados(files){
@@ -760,10 +773,13 @@ function cargarPlanillasDeFecha(fecha){
 
 function renderTeamPicks(equipos){
   var cont=document.getElementById("planillaTeams");
-  var avail={}; equipos.forEach(function(e){ avail[e.equipoLetra]=true; });
-  cont.innerHTML=["A","B","C","D"].map(function(L){
-    var dis=avail[L]?"":"disabled";
-    return '<button class="team-pick" id="pick'+L+'" '+dis+' onclick="aplicarPlanilla(\''+L+'\')">'+L+'</button>';
+  if (!equipos || !equipos.length){ cont.innerHTML=""; return; }
+  cont.innerHTML = equipos.map(function(e){
+    var sub = 'N° '+(e.nPartido||'—')+(e.rival?' · vs '+e.rival:'')+(e.hora?' · '+e.hora:'');
+    return '<button class="team-pick" id="pick'+e.equipoLetra+'" onclick="aplicarPlanilla(\''+e.equipoLetra+'\')">'
+      +   '<span class="tc-letra">'+e.equipoLetra+'</span>'
+      +   '<span class="tc-info"><b>CUBA '+e.equipoLetra+'</b><small>'+sub+'</small></span>'
+      + '</button>';
   }).join("");
 }
 
@@ -793,7 +809,7 @@ function aplicarPlanilla(letra){
 });
 
 // Cambiar la fecha manualmente recarga las planillas de ese día.
-fechaInput.addEventListener("change", function(){ cargarPlanillasDeFecha(fechaInput.value); });
+// (la carga por fecha usa el selector propio de la tarjeta: #fechaPlanillas)
 
 jugNomInput.addEventListener("keydown", function(e){ if(e.key==="Enter") addJugador(); });
 
