@@ -82,10 +82,20 @@ input,select,textarea{font-size:16px !important;}
 .planilla-status{font-size:13px;color:var(--muted);margin-top:10px;min-height:0;}
 .planilla-status.err{color:#f87171;}
 .planilla-status.ok{color:#4ade80;}
-.planilla-datefield{margin:4px 0 12px;}
-.planilla-datefield label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
-.planilla-datefield input{width:100%;padding:14px;background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--white);font-size:16px !important;font-family:'DM Sans',sans-serif;outline:none;}
-.planilla-datefield input:focus{border-color:var(--blue-light);}
+.planilla-datelabel{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:4px 0 8px;}
+.cal{background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 10px 8px;margin-bottom:12px;}
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.cal-title{font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:1px;color:var(--white);}
+.cal-nav{background:none;border:none;color:#7aaee8;font-size:26px;cursor:pointer;padding:0 12px;line-height:1;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-dow{text-align:center;font-size:11px;color:var(--muted);padding:2px 0;}
+.cal-cell{aspect-ratio:1;border:none;background:transparent;color:var(--white);font-family:'DM Sans',sans-serif;font-size:15px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;}
+.cal-cell.empty{visibility:hidden;cursor:default;}
+.cal-cell.hasmatch{background:rgba(46,111,212,.22);color:#9ec5ff;font-weight:700;}
+.cal-cell.hasmatch::after{content:"";position:absolute;bottom:5px;width:5px;height:5px;border-radius:50%;background:var(--blue-light);}
+.cal-cell.today{outline:1.5px solid var(--muted);outline-offset:-1.5px;}
+.cal-cell.sel{background:var(--blue);color:#fff;font-weight:700;}
+.cal-cell.sel::after{background:#fff;}
 .planilla-teams{display:flex;flex-direction:column;gap:8px;}
 .planilla-teams:empty{display:none;}
 .team-pick{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 14px;background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--white);cursor:pointer;}
@@ -309,10 +319,8 @@ input,select,textarea{font-size:16px !important;}
 
   <div class="planilla-card" id="planillaCard">
     <div class="planilla-title">Autocompletar desde planilla</div>
-    <div class="planilla-datefield">
-      <label for="fechaPlanillas">Ver partidos del día</label>
-      <input type="date" id="fechaPlanillas" onchange="cargarPlanillasDeFecha(this.value)" />
-    </div>
+    <div class="planilla-datelabel">Ver partidos del día</div>
+    <div class="cal" id="cal"></div>
     <div class="planilla-teams" id="planillaTeams"></div>
     <div class="planilla-status" id="planillaStatus"></div>
     <div class="planilla-sub" style="margin-top:14px;">
@@ -675,6 +683,7 @@ var modalData      = {};
 var startTimestamp = null;
 var editingIdx     = null;
 var planillaSel    = { nPartido: "" };   // planilla A/B/C/D seleccionada
+var calYear, calMonth, fechaSel = "", fechasConPartidos = {};   // calendario
 
 // ---- SETUP ----
 var rivalInput  = document.getElementById("rivalInput");
@@ -707,8 +716,9 @@ function sbParse(file){
 
 fechaInput.value = new Date().toISOString().split("T")[0];
 checkRecovery();
-document.getElementById("fechaPlanillas").value = fechaInput.value;   // hoy
-cargarPlanillasDeFecha(fechaInput.value);                             // al abrir: partidos de hoy
+(function(){ var h=new Date(); calYear=h.getFullYear(); calMonth=h.getMonth(); fechaSel=fechaInput.value; })();
+cargarFechasConPartidos();               // marca en el calendario los días con partidos
+cargarPlanillasDeFecha(fechaSel);        // al abrir: partidos de hoy
 
 // ---- PLANILLAS (subir PDF -> parsear+guardar en Supabase) ----
 function onPdfsSeleccionados(files){
@@ -769,6 +779,56 @@ function cargarPlanillasDeFecha(fecha){
   }).catch(function(err){
     status.className="planilla-status err"; status.textContent="Error al buscar planillas: "+(err&&err.message?err.message:err);
   });
+}
+
+// ---- CALENDARIO (días con partidos resaltados) ----
+function _pad2(n){ return (n<10?"0":"")+n; }
+function _ymd(y,m,d){ return y+"-"+_pad2(m+1)+"-"+_pad2(d); }
+
+function cargarFechasConPartidos(){
+  sbApi("getFechas").then(function(res){
+    fechasConPartidos = {};
+    if (res && res.fechas) res.fechas.forEach(function(f){ fechasConPartidos[f]=true; });
+    renderCalendario();
+  }).catch(function(){ renderCalendario(); });
+}
+
+function cambiarMes(delta){
+  calMonth += delta;
+  if (calMonth<0){ calMonth=11; calYear--; }
+  if (calMonth>11){ calMonth=0; calYear++; }
+  renderCalendario();
+}
+
+function seleccionarDia(f){
+  fechaSel = f;
+  renderCalendario();
+  cargarPlanillasDeFecha(f);
+}
+
+function renderCalendario(){
+  var cont = document.getElementById("cal");
+  if (!cont) return;
+  var meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  var h = new Date(); var hoyStr = _ymd(h.getFullYear(), h.getMonth(), h.getDate());
+  var offset = (new Date(calYear, calMonth, 1).getDay()+6)%7;   // lunes primero
+  var dias   = new Date(calYear, calMonth+1, 0).getDate();
+  var html = '<div class="cal-head">'
+    + '<button type="button" class="cal-nav" onclick="cambiarMes(-1)">&#8249;</button>'
+    + '<span class="cal-title">'+meses[calMonth]+' '+calYear+'</span>'
+    + '<button type="button" class="cal-nav" onclick="cambiarMes(1)">&#8250;</button>'
+    + '</div><div class="cal-grid">';
+  ["L","M","M","J","V","S","D"].forEach(function(d){ html+='<span class="cal-dow">'+d+'</span>'; });
+  for (var i=0;i<offset;i++) html+='<span class="cal-cell empty"></span>';
+  for (var d=1; d<=dias; d++){
+    var f = _ymd(calYear, calMonth, d);
+    var cls = "cal-cell";
+    if (fechasConPartidos[f]) cls+=" hasmatch";
+    if (f===fechaSel) cls+=" sel";
+    if (f===hoyStr)   cls+=" today";
+    html += '<button type="button" class="'+cls+'" onclick="seleccionarDia(\''+f+'\')">'+d+'</button>';
+  }
+  cont.innerHTML = html + '</div>';
 }
 
 function renderTeamPicks(equipos){
