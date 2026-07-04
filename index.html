@@ -336,24 +336,6 @@ input,select,textarea{font-size:16px !important;}
     <input class="field-input" id="rivalInput" type="text" inputmode="text" placeholder="Nombre del rival" autocomplete="off" />
   </div>
   <div class="field-group">
-    <div class="field-label">Cancha</div>
-    <select class="field-input" id="canchaInput">
-      <option value="">-- Seleccionar --</option>
-      <option value="Local">Local</option>
-      <option value="Visitante">Visitante</option>
-      <option value="Neutral">Neutral</option>
-    </select>
-  </div>
-  <div class="field-group">
-    <div class="field-label">Camada</div>
-    <select class="field-input" id="camadaInput">
-      <option value="">-- Seleccionar --</option>
-      <option value="M13">M13</option>
-      <option value="M14">M14</option>
-      <option value="M15">M15</option>
-    </select>
-  </div>
-  <div class="field-group">
     <div class="field-label">Cantidad de tiempos</div>
     <select class="field-input" id="cantTiemposInput">
       <option value="2">2 tiempos</option>
@@ -678,13 +660,11 @@ var partido        = {};
 var modalData      = {};
 var startTimestamp = null;
 var editingIdx     = null;
-var planillaSel    = { nPartido: "" };   // planilla A/B/C/D seleccionada
+var planillaSel    = { nPartido: "", camada: "", cancha: "" };   // planilla A/B/C/D seleccionada
 var calYear, calMonth, fechaSel = "", fechasConPartidos = {};   // calendario
 
 // ---- SETUP ----
 var rivalInput  = document.getElementById("rivalInput");
-var canchaInput = document.getElementById("canchaInput");
-var camadaInput = document.getElementById("camadaInput");
 var jugNumInput = document.getElementById("jugNumInput");
 var jugNomInput = document.getElementById("jugNomInput");
 
@@ -842,11 +822,9 @@ function aplicarPlanilla(letra){
   if (!e) return;
   rivalInput.value  = e.rival || "";
   if (e.fecha)  fechaSel = e.fecha;
-  if (e.camada) camadaInput.value = e.camada;
-  if (e.cancha) canchaInput.value = e.cancha;
   jugadores = (e.jugadores||[]).map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
   renderJugadores();
-  planillaSel = { nPartido: e.nPartido || "" };
+  planillaSel = { nPartido: e.nPartido || "", camada: e.camada || "", cancha: e.cancha || "" };
   ["A","B","C","D"].forEach(function(L){
     var b=document.getElementById("pick"+L); if(b) b.classList.toggle("sel", L===letra);
   });
@@ -857,10 +835,8 @@ function aplicarPlanilla(letra){
   checkSetupReady();
 }
 
-[rivalInput, canchaInput, camadaInput].forEach(function(el){
-  el.addEventListener("input", checkSetupReady);
-  el.addEventListener("change", checkSetupReady);
-});
+rivalInput.addEventListener("input", checkSetupReady);
+rivalInput.addEventListener("change", checkSetupReady);
 
 // Cambiar la fecha manualmente recarga las planillas de ese día.
 // (la carga por fecha usa el selector propio de la tarjeta: #fechaPlanillas)
@@ -911,7 +887,7 @@ function iniciarPartido(){
   }
   var cantT = parseInt(document.getElementById("cantTiemposInput").value) || 2;
   var durT  = parseInt(document.getElementById("durTiempoInput").value)  || 35;
-  partido = { rival:rival, fecha:fechaSel, cancha:canchaInput.value.trim()||"", camada:camadaInput.value.trim()||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"" };
+  partido = { rival:rival, fecha:fechaSel, cancha:planillaSel.cancha||"", camada:planillaSel.camada||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"" };
   document.getElementById("scoreRivalLabel").textContent = rival.toUpperCase();
   document.getElementById("headerTitle").textContent   = "CUBA vs "+rival.toUpperCase();
   document.getElementById("headerMeta").textContent    = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
