@@ -911,7 +911,7 @@ function iniciarPartido(){
   setTeamTab("CUBA");
   showScreen("screenMatch");
   setEventButtonsEnabled(false);
-  if (typeof google !== 'undefined' && google.script){
+  if (true){
     sbApi("syncRoster", { nPartido: getPartidoId(), jugadores: jugadores });
   }
 }
@@ -945,6 +945,14 @@ document.getElementById("confirmOk").addEventListener("click", function(){ var c
 document.getElementById("confirmCancel").addEventListener("click", _confirmClose);
 document.getElementById("confirmOverlay").addEventListener("click", function(e){ if(e.target===this) _confirmClose(); });
 
+// Cada tick recalcula el tiempo REAL transcurrido (no cuenta ticks). Así el
+// reloj sobrevive a que la tablet se duerma/hiberne: al despertar recalcula.
+function tickTimer(){
+  if (startTimestamp) timerSecs = Math.floor((Date.now() - startTimestamp) / 1000);
+  else timerSecs++;
+  updateTimerDisplay();
+}
+
 function detenerTimer(){
   clearInterval(timerInt); timerInt = null;
   document.getElementById("btnStartStop").textContent  = "CONTINUAR";
@@ -957,20 +965,24 @@ function toggleTimer(){
   if (timerInt){
     mostrarConfirm("¿Detener el cronómetro?", detenerTimer, "&#9208;&#65039;");
   } else {
-    if (!startTimestamp){
-      startTimestamp = Date.now() - (timerSecs * 1000);
-      if (partido && partido.rival){
-        var pid = getPartidoId();
-        if (pid) sbApi("setTimestamp", { nPartido: pid, ts: startTimestamp });
-      }
+    // Rebasar el arranque al tiempo real (maneja pausa Y sleep):
+    // elapsed = ahora - startTimestamp, partiendo del timerSecs actual.
+    startTimestamp = Date.now() - (timerSecs * 1000);
+    if (partido && partido.rival){
+      var pid = getPartidoId();
+      if (pid) sbApi("setTimestamp", { nPartido: pid, ts: startTimestamp });
     }
-    timerInt = setInterval(function(){ timerSecs++; updateTimerDisplay(); }, 1000);
+    timerInt = setInterval(tickTimer, 1000);
     document.getElementById("btnStartStop").textContent  = "DETENER";
     document.getElementById("btnStartStop").className    = "btn-timer btn-stop";
     document.getElementById("timerDisplay").classList.add("running");
     setEventButtonsEnabled(true);
   }
 }
+
+// Al volver de sleep / cambiar de pestaña, recalcular el reloj de inmediato.
+document.addEventListener("visibilitychange", function(){ if (!document.hidden && timerInt) tickTimer(); });
+window.addEventListener("focus", function(){ if (timerInt) tickTimer(); });
 
 function resetTimer(){
   mostrarConfirm("¿Reiniciar el cronómetro a 00:00? (no borra las incidencias)", function(){
@@ -1072,7 +1084,7 @@ function confirmarEvento(){
   closeModal();
   updateScore();
   renderHistorial();
-  if (typeof google !== 'undefined' && google.script){
+  if (true){
     sbApi("syncEventos", { partido: partido, eventos: eventos });
   }
 }
@@ -1112,7 +1124,7 @@ function confirmarCambio(){
   eventos.push({ tipo:"Cambio", pts:0, icon:"&#x1F501;", jugador:label, minuto:minStr, periodo:periodo, equipo:"CUBA" });
   closeCambioModal();
   updateScore(); renderHistorial();
-  if (typeof google !== 'undefined' && google.script){
+  if (true){
     sbApi("syncEventos", { partido: partido, eventos: eventos });
   }
 }
@@ -1296,7 +1308,7 @@ function onEventBtn(tipo, pts, icon){
     var jugLabel=activeTeam==="RIVAL"?(partido.rival||"Rival"):"(penal)";
     eventos.push({tipo:tipo,pts:pts,icon:icon,jugador:jugLabel,minuto:minStr,periodo:periodo,equipo:activeTeam});
     updateScore(); renderHistorial();
-    if (typeof google !== 'undefined' && google.script){
+    if (true){
       sbApi("syncEventos", { partido: partido, eventos: eventos });
     }
   } else {
@@ -1309,7 +1321,7 @@ function borrarEvento(idx){
   var partidoId = getPartidoId();
   eventos.splice(idx,1);
   updateScore(); renderHistorial();
-  if (partidoId && typeof google !== 'undefined' && google.script){
+  if (partidoId && true){
     sbApi("syncEventos", { partido: partido, eventos: eventos });
   }
 }
@@ -1346,7 +1358,7 @@ function confirmarEdicion(){
   eventos[editingIdx]={tipo:tipo,pts:pts,icon:icon,jugador:jugador,minuto:minuto,periodo:per,equipo:equipo};
   closeEditModal(); updateScore(); renderHistorial();
   var partidoId=getPartidoId();
-  if (partidoId && typeof google !== 'undefined' && google.script){
+  if (partidoId && true){
     sbApi("syncEventos", { partido: partido, eventos: eventos });
   }
 }
@@ -1396,7 +1408,7 @@ function retomarPartido(){
       startTimestamp=ts;
       timerSecs=Math.max(0,Math.floor((Date.now()-ts)/1000));
       updateTimerDisplay();
-      timerInt=setInterval(function(){ timerSecs++; updateTimerDisplay(); },1000);
+      timerInt=setInterval(tickTimer,1000);
       document.getElementById("btnStartStop").textContent="DETENER";
       document.getElementById("btnStartStop").className="btn-timer btn-stop";
       document.getElementById("timerDisplay").classList.add("running");
