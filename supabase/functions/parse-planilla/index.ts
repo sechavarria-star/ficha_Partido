@@ -5,6 +5,7 @@
 // Reemplaza al OCR de Drive: ~1-2 s por PDF, sin rate limit.
 // ============================================================
 import { extractText, getDocumentProxy } from "https://esm.sh/unpdf@0.12.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 interface Jugador { num: string; nom: string; dni: string; }
 interface Planilla {
@@ -40,6 +41,39 @@ const END_VISIT = [/Indicar/i, /Informaci[oó]n/i, /Pos\s*Dor/i, /Local\s+Puntos
 
 function limpiarRival(s: string): string {
   return String(s).replace(/CUBA\s+[A-D]\b/gi, "").replace(/\s{2,}/g, " ").trim();
+}
+
+// Guarda partido + roster en la base (service_role, bypass RLS). Idempotente:
+// upsert del partido por n_partido y reemplazo del roster.
+async function guardarEnBase(p: Planilla): Promise<{ saved: boolean; error?: string }> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return { saved: false, error: "Sin SUPABASE_URL/SERVICE_ROLE_KEY" };
+  try {
+    const sb = createClient(url, key);
+    const up = await sb.from("ficha_partido_partidos").upsert({
+      n_partido: p.nPartido,
+      equipo: "CUBA " + p.equipoLetra,
+      rival: p.rival,
+      fecha: p.fecha || null,
+      hora: p.hora,
+      camada: p.camada,
+      cancha: p.cancha,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "n_partido" });
+    if (up.error) return { saved: false, error: up.error.message };
+
+    await sb.from("ficha_partido_roster").delete().eq("n_partido", p.nPartido);
+    if (p.jugadores.length) {
+      const ins = await sb.from("ficha_partido_roster").insert(
+        p.jugadores.map((j) => ({ n_partido: p.nPartido, dorsal: j.num, nombre: j.nom, dni: j.dni })),
+      );
+      if (ins.error) return { saved: false, error: ins.error.message };
+    }
+    return { saved: true };
+  } catch (e) {
+    return { saved: false, error: String((e as Error)?.message ?? e) };
+  }
 }
 
 // Mismo parser que el de Apps Script (parsePlanilla_), validado contra los PDF reales.
@@ -103,7 +137,15 @@ Deno.serve(async (req: Request) => {
     if (!buf.length) return json({ error: "PDF vacío" }, 400);
     const pdf = await getDocumentProxy(buf);
     const { text } = await extractText(pdf, { mergePages: true });
-    return json(parsePlanilla(text as string));
+    const planilla = parsePlanilla(text as string);
+
+    // Persistir en la base si se reconoció el partido.
+    let saved = false, saveError: string | undefined;
+    if (planilla.nPartido && planilla.equipoLetra) {
+      const r = await guardarEnBase(planilla);
+      saved = r.saved; saveError = r.error;
+    }
+    return json({ ...planilla, saved, saveError });
   } catch (e) {
     return json({ error: String((e as Error)?.message ?? e) }, 500);
   }
