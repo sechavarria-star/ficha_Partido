@@ -269,6 +269,46 @@ input,select,textarea{font-size:16px !important;}
   body{background:#fff;color:#000;}
   .resumen-card{background:#fff;border:1px solid #ddd;}
 }
+
+/* ============ TEMA SOL (claro, alto contraste para el sol) ============ */
+.header-row{justify-content:space-between;}
+.tema-toggle{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:50%;width:40px;height:40px;font-size:20px;line-height:1;cursor:pointer;flex-shrink:0;color:#fff;}
+
+body.light{
+  --navy:#eef2f9; --navy-mid:#dde5f2; --navy-card:#ffffff;
+  --blue:#1a4fa0; --blue-light:#2e6fd4;
+  --white:#0c1830;            /* texto principal (ahora oscuro) */
+  --muted:#516686;
+  --border:#c3cfe4;
+  --green:#0a7d42; --red:#c81e1e; --amber:#b45309; --yellow:#9a7400;
+}
+body.light .app-header{background:linear-gradient(135deg,#eef2f9 0%,#dbe4f3 100%);}
+body.light .header-tag{color:#1a4fa0;}
+body.light .tema-toggle{background:rgba(26,79,160,.1);border-color:rgba(26,79,160,.3);color:#1a4fa0;}
+/* score / timer: contraste sobre claro */
+body.light #scoreRival{color:var(--red)!important;}
+body.light .timer-display.running,body.light .progress-label{color:var(--green);}
+body.light .score-sep{color:#94a7c4;}
+/* calendario: día con partido bien visible */
+body.light .cal-cell.hasmatch{background:rgba(46,111,212,.16);color:#1a4fa0;}
+/* botones de puntos: relleno sólido y vivo */
+body.light .btn-try,body.light .btn-try-penal{background:var(--green);border-color:var(--green);color:#fff;}
+body.light .btn-conv{background:var(--blue);border-color:var(--blue);color:#fff;}
+body.light .btn-penal{background:#c26a00;border-color:#c26a00;color:#fff;}
+body.light .btn-drop{background:#7c3aed;border-color:#7c3aed;color:#fff;}
+body.light .btn-cambio-ev{background:#0d9488;border-color:#0d9488;color:#fff;}
+body.light .rival-event{background:var(--red)!important;border-color:var(--red)!important;color:#fff!important;}
+/* tarjetas */
+body.light .btn-amarilla{background:#eab308;border-color:#c99700;color:#2a2100;}
+body.light .btn-amarilla .card-icon{background:#2a2100;}
+body.light .btn-roja{background:var(--red);border-color:var(--red);color:#fff;}
+body.light .btn-roja .card-icon{background:#fff;}
+body.light .btn-azul{background:#2563eb;border-color:#2563eb;color:#fff;}
+body.light .btn-azul .card-icon{background:#fff;}
+/* modales + barra de zoom */
+body.light .modal{background:#fff;}
+body.light .zoom-bar{background:rgba(255,255,255,.96);}
+body.light .zoom-toggle{color:#516686;}
 </style>
 </head>
 <body>
@@ -296,6 +336,7 @@ input,select,textarea{font-size:16px !important;}
     }
   }
   try{ if(localStorage.getItem("ficha_pin_ok")==="1") document.getElementById("pinGate").style.display="none"; }catch(e){}
+  try{ if(localStorage.getItem("ficha_tema")==="light") document.body.classList.add("light"); }catch(e){}
 </script>
 
 <header class="app-header">
@@ -305,6 +346,7 @@ input,select,textarea{font-size:16px !important;}
       <div class="header-title" id="headerTitle">Ficha de Partido</div>
       <div class="header-meta" id="headerMeta"></div>
     </div>
+    <button id="temaBtn" class="tema-toggle" onclick="toggleTema()" title="Cambiar tema (sol/noche)">&#9728;&#65039;</button>
   </div>
 </header>
 
@@ -663,6 +705,18 @@ function toggleZoomBar() {
   } catch(e){}
 })();
 
+// ---- TEMA (sol/noche) ----
+function toggleTema(){
+  var light = document.body.classList.toggle('light');
+  try { localStorage.setItem('ficha_tema', light ? 'light' : 'dark'); } catch(e){}
+  _setTemaIcon();
+}
+function _setTemaIcon(){
+  var b = document.getElementById('temaBtn');
+  if (b) b.innerHTML = document.body.classList.contains('light') ? '&#127769;' : '&#9728;&#65039;'; // 🌙 / ☀️
+}
+_setTemaIcon();
+
 // ---- STATE ----
 var jugadores      = [];
 var eventos        = [];
@@ -704,8 +758,7 @@ function sbParse(file){
 
 checkRecovery();
 (function(){ var h=new Date(); calYear=h.getFullYear(); calMonth=h.getMonth(); fechaSel=_ymd(h.getFullYear(),h.getMonth(),h.getDate()); })();
-cargarFechasConPartidos();               // marca en el calendario los días con partidos
-cargarPlanillasDeFecha(fechaSel);        // al abrir: partidos de hoy
+cargarFechasConPartidos();               // marca días con partidos, salta al próximo y carga esa fecha
 
 // ---- PLANILLAS (subir PDF -> parsear+guardar en Supabase) ----
 function onPdfsSeleccionados(files){
@@ -775,9 +828,26 @@ function _ymd(y,m,d){ return y+"-"+_pad2(m+1)+"-"+_pad2(d); }
 function cargarFechasConPartidos(){
   sbApi("getFechas").then(function(res){
     fechasConPartidos = {};
-    if (res && res.fechas) res.fechas.forEach(function(f){ fechasConPartidos[f]=true; });
+    var fechas = (res && res.fechas) ? res.fechas.slice() : [];
+    fechas.forEach(function(f){ fechasConPartidos[f]=true; });
+    // Si HOY no tiene partidos, saltar al próximo con partido (o al último pasado).
+    if (!fechasConPartidos[fechaSel] && fechas.length){
+      fechas.sort();
+      var hoy = fechaSel, prox = null, ultimo = null;
+      fechas.forEach(function(f){
+        if (f >= hoy && (prox   === null || f < prox))   prox   = f;
+        if (f <  hoy && (ultimo === null || f > ultimo)) ultimo = f;
+      });
+      var target = prox || ultimo;
+      if (target){
+        fechaSel = target;
+        var p = target.split("-");
+        calYear = parseInt(p[0],10); calMonth = parseInt(p[1],10)-1;
+      }
+    }
     renderCalendario();
-  }).catch(function(){ renderCalendario(); });
+    cargarPlanillasDeFecha(fechaSel);
+  }).catch(function(){ renderCalendario(); cargarPlanillasDeFecha(fechaSel); });
 }
 
 function cambiarMes(delta){
