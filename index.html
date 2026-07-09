@@ -241,6 +241,10 @@ input,select,textarea{font-size:16px !important;}
 .resumen-score{text-align:center;margin-bottom:12px;}
 .resumen-score .num{font-family:'Bebas Neue',sans-serif;font-size:64px;color:var(--white);line-height:1;}
 .resumen-score .label{font-size:12px;color:var(--muted);}
+.resumen-teams{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;color:var(--white);line-height:1.1;margin-bottom:4px;}
+.resumen-teams small{font-size:14px;color:var(--muted);font-family:'DM Sans',sans-serif;}
+.resumen-bono{font-size:14px;color:var(--amber);font-weight:700;margin-top:6px;}
+.resumen-bono:empty{display:none;}
 .resumen-table{width:100%;border-collapse:collapse;font-size:13px;}
 .resumen-table th{padding:6px 8px;background:rgba(26,79,160,.2);color:var(--muted);font-weight:600;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;}
 .resumen-table td{padding:7px 8px;border-bottom:1px solid rgba(30,48,80,.5);}
@@ -265,9 +269,16 @@ input,select,textarea{font-size:16px !important;}
 
 /* PRINT */
 @media print{
-  .app-header,.fab-export,.timer-btns,.events-section,.btn-volver,.export-btns,.zoom-bar,.zoom-toggle{display:none!important;}
-  body{background:#fff;color:#000;}
-  .resumen-card{background:#fff;border:1px solid #ddd;}
+  .app-header,.fab-export,.timer-btns,.events-section,.btn-volver,.export-btns,.zoom-bar,.zoom-toggle,.btn-finalizar,#finalizarStatus{display:none!important;}
+  body{background:#fff!important;color:#111!important;}
+  #screenResumen{background:#fff!important;}
+  .resumen-card{background:#fff!important;border:1px solid #ccc;}
+  .resumen-card, .resumen-card *{color:#111!important;}
+  .resumen-teams small,#resumenMeta,.tag-min,.tag-jug{color:#666!important;}
+  .resumen-bono{color:#b45309!important;}
+  .tag-pts{color:#0a7d42!important;}
+  .tag-pts.cero{color:#999!important;}
+  .resumen-table th{background:#eee!important;color:#333!important;}
 }
 
 /* ============ TEMA SOL (claro, alto contraste para el sol) ============ */
@@ -534,8 +545,9 @@ body.light .zoom-toggle{color:#516686;}
 <div class="screen" id="screenResumen"><div class="resumen-wrap">
   <div class="resumen-card">
     <div class="resumen-score">
+      <div class="resumen-teams" id="resumenVs">CUBA vs RIVAL</div>
       <div class="num" id="resumenScore">0</div>
-      <div class="label" id="resumenVs">CUBA vs RIVAL</div>
+      <div class="resumen-bono" id="resumenBono"></div>
     </div>
     <div id="resumenMeta" style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:12px;"></div>
     <table class="resumen-table" id="resumenTable">
@@ -727,7 +739,8 @@ var partido        = {};
 var modalData      = {};
 var startTimestamp = null;
 var editingIdx     = null;
-var planillaSel    = { nPartido: "", camada: "", cancha: "" };   // planilla A/B/C/D seleccionada
+var planillaSel    = { nPartido: "", camada: "", cancha: "", equipoLetra: "" };   // planilla A/B/C/D seleccionada
+var resultadoActual = { cuba:0, rival:0, bonusCuba:0, bonusRival:0 };
 var calYear, calMonth, fechaSel = "", fechasConPartidos = {};   // calendario
 
 // ---- SETUP ----
@@ -907,7 +920,7 @@ function aplicarPlanilla(letra){
   if (e.fecha)  fechaSel = e.fecha;
   jugadores = (e.jugadores||[]).map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
   renderJugadores();
-  planillaSel = { nPartido: e.nPartido || "", camada: e.camada || "", cancha: e.cancha || "" };
+  planillaSel = { nPartido: e.nPartido || "", camada: e.camada || "", cancha: e.cancha || "", equipoLetra: e.equipoLetra || letra };
   ["A","B","C","D"].forEach(function(L){
     var b=document.getElementById("pick"+L); if(b) b.classList.toggle("sel", L===letra);
   });
@@ -970,7 +983,7 @@ function iniciarPartido(){
   }
   var cantT = parseInt(document.getElementById("cantTiemposInput").value) || 2;
   var durT  = parseInt(document.getElementById("durTiempoInput").value)  || 35;
-  partido = { rival:rival, fecha:fechaSel, cancha:planillaSel.cancha||"", camada:planillaSel.camada||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"" };
+  partido = { rival:rival, fecha:fechaSel, cancha:planillaSel.cancha||"", camada:planillaSel.camada||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"", equipoLetra:planillaSel.equipoLetra||"" };
   document.getElementById("scoreRivalLabel").textContent = rival.toUpperCase();
   document.getElementById("headerTitle").textContent   = "CUBA vs "+rival.toUpperCase();
   document.getElementById("headerMeta").textContent    = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
@@ -1222,6 +1235,7 @@ function updateScore(){
   if (rival < cuba && (cuba - rival) <= 7) bonusRival++;   // RIVAL perdió por <=7
   pintarBonus("bonusCuba", bonusCuba);
   pintarBonus("bonusRival", bonusRival);
+  resultadoActual = { cuba:cuba, rival:rival, bonusCuba:bonusCuba, bonusRival:bonusRival };
 }
 
 function pintarBonus(id, n){
@@ -1260,9 +1274,19 @@ function irResumen(){
   var fb=document.getElementById("btnFinalizar");
   fb.disabled=false; fb.classList.remove("done"); fb.innerHTML="&#10004; FINALIZAR PARTIDO";
   document.getElementById("finalizarStatus").textContent="";
-  document.getElementById("resumenVs").textContent  = "CUBA vs "+partido.rival.toUpperCase();
-  document.getElementById("resumenMeta").textContent = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
+  var equipoCuba = partido.equipoLetra ? ("CUBA "+partido.equipoLetra) : "CUBA";
+  document.getElementById("resumenVs").innerHTML = equipoCuba.toUpperCase()+' <small>vs</small> '+partido.rival.toUpperCase();
+  var meta = [partido.fecha, partido.camada, partido.cancha];
+  if (partido.nPartido) meta.unshift("Partido N° "+partido.nPartido);
+  document.getElementById("resumenMeta").textContent = meta.filter(Boolean).join(" | ");
   updateScore();
+  // Línea de punto bonus (solo si algún equipo lo tiene)
+  var r = resultadoActual;
+  function bonoStr(nombre, b){ return nombre + (b>1 ? (" (B×"+b+")") : " (B)"); }
+  var partes = [];
+  if (r.bonusCuba  > 0) partes.push(bonoStr(equipoCuba, r.bonusCuba));
+  if (r.bonusRival > 0) partes.push(bonoStr(partido.rival, r.bonusRival));
+  document.getElementById("resumenBono").textContent = partes.length ? ("Punto bonus: "+partes.join("   ·   ")) : "";
   var tbody = document.getElementById("resumenBody");
   if (!eventos.length){
     tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px;">Sin eventos</td></tr>';
@@ -1306,7 +1330,15 @@ function finalizarPartido(){
 }
 
 // ---- EXPORT ----
-function exportarPDF(){ window.print(); }
+function exportarPDF(){
+  // El título del documento define el nombre sugerido del PDF al imprimir.
+  var equipoCuba = partido.equipoLetra ? ("CUBA "+partido.equipoLetra) : "CUBA";
+  var np   = partido.nPartido ? (" - Partido "+partido.nPartido) : "";
+  var orig = document.title;
+  document.title = equipoCuba + " vs " + (partido.rival||"Rival") + np + (partido.fecha ? (" ("+partido.fecha+")") : "");
+  window.print();
+  setTimeout(function(){ document.title = orig; }, 800);
+}
 
 function exportarExcel(){
   var rival      = partido.rival||"Rival";
