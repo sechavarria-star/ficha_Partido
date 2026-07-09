@@ -231,6 +231,11 @@ input,select,textarea{font-size:16px !important;}
 .modal select:focus,.modal input:focus{border-color:var(--blue-light);}
 .modal select option{background:#0d1a2e;}
 .modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
+.sugerencias{max-height:230px;overflow-y:auto;margin-top:6px;}
+.sug-item{display:flex;align-items:center;gap:12px;padding:12px 12px;margin-top:6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--navy-mid);color:var(--white);font-size:16px;cursor:pointer;}
+.sug-item:active{background:rgba(46,111,212,.25);border-color:var(--blue-light);}
+.sug-num{min-width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--blue);color:#fff;border-radius:50%;font-size:14px;font-weight:700;}
+.sug-empty{padding:12px;text-align:center;color:var(--muted);font-size:14px;}
 .btn-cancel{padding:14px;background:transparent;border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;}
 .btn-confirm{padding:14px;background:var(--blue);border:none;border-radius:var(--radius-sm);color:#fff;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;cursor:pointer;}
 
@@ -571,14 +576,9 @@ body.light .zoom-toggle{color:#516686;}
   <div class="modal">
     <div class="modal-title" id="modalTitle">Registrar Try</div>
     <div class="modal-field">
-      <div class="modal-label">Jugador (lista)</div>
-      <select id="modalJugSelect">
-        <option value="">-- Seleccionar --</option>
-      </select>
-    </div>
-    <div class="modal-field">
-      <div class="modal-label">O numero de camiseta</div>
-      <input type="text" inputmode="numeric" id="modalNumInput" placeholder="Ej: 9" autocomplete="off" />
+      <div class="modal-label">Jugador (nombre o número)</div>
+      <input type="text" id="modalBuscar" placeholder="Empezá a escribir…" autocomplete="off" oninput="filtrarJugadores(this.value)" />
+      <div class="sugerencias" id="modalSugerencias"></div>
     </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
@@ -737,6 +737,7 @@ var timerInt       = null;
 var periodo        = "1T";
 var partido        = {};
 var modalData      = {};
+var modalJugSel    = null;   // jugador elegido en el buscador del modal de evento
 var startTimestamp = null;
 var editingIdx     = null;
 var planillaSel    = { nPartido: "", camada: "", cancha: "", equipoLetra: "" };   // planilla A/B/C/D seleccionada
@@ -1130,13 +1131,32 @@ function setPeriodo(p){
 function openModal(tipo, pts, icon, equipo){
   modalData = {tipo:tipo, pts:pts, icon:icon, equipo:equipo||"CUBA"};
   document.getElementById("modalTitle").innerHTML = icon+" &nbsp;"+tipo;
-  var sel = document.getElementById("modalJugSelect");
-  sel.innerHTML = '<option value="">-- Seleccionar --</option>';
-  jugadores.forEach(function(j,i){
-    sel.innerHTML += '<option value="'+i+'">#'+j.num+' '+j.nom+'</option>';
-  });
-  document.getElementById("modalNumInput").value = "";
+  modalJugSel = null;
+  document.getElementById("modalBuscar").value = "";
+  document.getElementById("modalSugerencias").innerHTML = "";
   document.getElementById("modalOverlay").classList.add("open");
+}
+
+// Filtra el roster en vivo por nombre o número mientras se escribe.
+function filtrarJugadores(q){
+  modalJugSel = null;                 // tipear anula una selección previa
+  var cont = document.getElementById("modalSugerencias");
+  q = (q||"").trim().toLowerCase();
+  if (!q){ cont.innerHTML = ""; return; }
+  var res = [];
+  for (var i=0; i<jugadores.length && res.length<8; i++){
+    var j = jugadores[i];
+    if ((j.nom||"").toLowerCase().indexOf(q) >= 0 || String(j.num).indexOf(q) >= 0){
+      res.push('<div class="sug-item" onclick="seleccionarJugadorModal('+i+')"><span class="sug-num">'+j.num+'</span>'+j.nom+'</div>');
+    }
+  }
+  cont.innerHTML = res.length ? res.join("") : '<div class="sug-empty">Sin coincidencias — se guarda lo que escribas</div>';
+}
+
+function seleccionarJugadorModal(i){
+  modalJugSel = jugadores[i];
+  document.getElementById("modalBuscar").value = "#"+modalJugSel.num+" "+modalJugSel.nom;
+  document.getElementById("modalSugerencias").innerHTML = "";
 }
 
 function closeModal(){
@@ -1150,14 +1170,12 @@ function closeModalOutside(e){
 }
 
 function confirmarEvento(){
-  var sel    = document.getElementById("modalJugSelect");
-  var numIn  = document.getElementById("modalNumInput").value.trim();
-  var jugLabel = "";
-  if (sel.value !== ""){
-    var j = jugadores[parseInt(sel.value)];
-    jugLabel = "#"+j.num+" "+j.nom;
-  } else if (numIn){
-    jugLabel = "#"+numIn;
+  var txt = document.getElementById("modalBuscar").value.trim();
+  var jugLabel;
+  if (modalJugSel){
+    jugLabel = "#"+modalJugSel.num+" "+modalJugSel.nom;
+  } else if (txt){
+    jugLabel = /^\d+$/.test(txt) ? ("#"+txt) : txt;   // solo número → #N; si no, texto libre
   } else {
     jugLabel = "Sin asignar";
   }
