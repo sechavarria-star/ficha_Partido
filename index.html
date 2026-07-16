@@ -105,11 +105,14 @@ input,select,textarea{font-size:16px !important;}
 .cal-right .field-input{padding:12px 14px;font-size:18px;}
 .planilla-teams{display:flex;flex-direction:column;gap:8px;}
 .planilla-teams:empty{display:none;}
-.team-pick{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 14px;background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--white);cursor:pointer;}
+.team-pick{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px 8px 14px;background:var(--navy-mid);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--white);}
+.tc-main{display:flex;align-items:center;gap:14px;flex:1;min-width:0;cursor:pointer;text-align:left;}
 .team-pick .tc-letra{width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--blue);border-radius:50%;font-family:'Bebas Neue',sans-serif;font-size:24px;color:#fff;}
-.team-pick .tc-info{display:flex;flex-direction:column;line-height:1.3;}
+.team-pick .tc-info{display:flex;flex-direction:column;line-height:1.3;min-width:0;}
 .team-pick .tc-info b{font-size:17px;font-weight:600;}
-.team-pick .tc-info small{font-size:13px;color:var(--muted);}
+.team-pick .tc-info small{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tc-resumen{flex-shrink:0;background:var(--navy-card);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:#7aaee8;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;padding:12px 12px;cursor:pointer;white-space:nowrap;}
+.tc-resumen:active{background:var(--blue);color:#fff;border-color:var(--blue-light);}
 .team-pick.sel{background:rgba(46,111,212,.18);border-color:var(--blue-light);}
 .team-pick.sel .tc-letra{background:var(--blue-light);}
 .planilla-badge{display:inline-block;margin-top:10px;padding:4px 10px;background:rgba(46,111,212,.18);border:1px solid var(--blue-light);border-radius:14px;font-size:13px;color:#93c5fd;}
@@ -568,7 +571,7 @@ body.light .zoom-toggle{color:#516686;}
   </div>
   <button class="btn-finalizar" id="btnFinalizar" onclick="finalizarPartido()">&#10004; FINALIZAR PARTIDO</button>
   <div id="finalizarStatus" style="text-align:center;font-size:13px;color:var(--muted);margin-top:8px;min-height:16px;"></div>
-  <button class="btn-volver" onclick="volverPartido()">&#8592; Volver al partido</button>
+  <button class="btn-volver" id="btnVolver" onclick="volverPartido()">&#8592; Volver al partido</button>
 </div></div>
 
 <!-- MODAL EVENTO -->
@@ -906,12 +909,41 @@ function renderTeamPicks(equipos){
   var cont=document.getElementById("planillaTeams");
   if (!equipos || !equipos.length){ cont.innerHTML=""; return; }
   cont.innerHTML = equipos.map(function(e){
+    var L = e.equipoLetra;
     var sub = 'N° '+(e.nPartido||'—')+(e.rival?' · vs '+e.rival:'')+(e.hora?' · '+e.hora:'');
-    return '<button class="team-pick" id="pick'+e.equipoLetra+'" onclick="aplicarPlanilla(\''+e.equipoLetra+'\')">'
-      +   '<span class="tc-letra">'+e.equipoLetra+'</span>'
-      +   '<span class="tc-info"><b>CUBA '+e.equipoLetra+'</b><small>'+sub+'</small></span>'
-      + '</button>';
+    return '<div class="team-pick" id="pick'+L+'">'
+      +   '<div class="tc-main" onclick="aplicarPlanilla(\''+L+'\')">'
+      +     '<span class="tc-letra">'+L+'</span>'
+      +     '<span class="tc-info"><b>CUBA '+L+'</b><small>'+sub+'</small></span>'
+      +   '</div>'
+      +   '<button class="tc-resumen" onclick="verResumenPartido(\''+L+'\')" title="Ver / descargar resumen de eventos">&#128203; Resumen</button>'
+      + '</div>';
   }).join("");
+}
+
+// Abre el resumen de eventos de un partido ya jugado (desde su tarjeta),
+// cargando las incidencias guardadas en Supabase. Sin jugar el partido.
+function verResumenPartido(letra){
+  var e = window.__equipos && window.__equipos[letra];
+  if (!e) return;
+  window.__resumenView = true;
+  partido = { rival:e.rival||"", fecha:e.fecha||fechaSel, cancha:e.cancha||"", camada:e.camada||"",
+              cantT:2, durT:35, nPartido:e.nPartido||"", equipoLetra:e.equipoLetra||letra };
+  jugadores = (e.jugadores||[]).map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
+  var st = document.getElementById("planillaStatus");
+  if (!partido.nPartido){ eventos=[]; irResumen(); return; }
+  if (st){ st.className="planilla-status"; st.textContent="Cargando resumen de CUBA "+letra+"…"; }
+  sbApi("getPartido", { id: partido.nPartido }).then(function(res){
+    var iconMap={"Try":"&#x1F3C9;","Try Penal":"&#x1F3C9;","Conversion":"&#x1F3AF;","Penal":"&#x1F94A;","Drop":"&#x1F91E;","Tarjeta Amarilla":"&#x1F7E8;","Tarjeta Roja":"&#x1F7E5;","Tarjeta Azul":"&#x1F7E6;","Cambio":"&#x1F501;"};
+    eventos = (res && res.eventos ? res.eventos : []).map(function(ev){
+      return {tipo:ev.tipo, pts:Number(ev.pts)||0, icon:iconMap[ev.tipo]||"&#x1F3C9;", jugador:ev.jugador, minuto:ev.minuto, periodo:ev.periodo, equipo:ev.equipo||"CUBA"};
+    });
+    document.getElementById("scoreRivalLabel").textContent = partido.rival.toUpperCase();
+    if (st) st.textContent="";
+    irResumen();
+  }).catch(function(err){
+    if (st){ st.className="planilla-status err"; st.textContent="Error al cargar el resumen: "+(err&&err.message?err.message:err); }
+  });
 }
 
 function aplicarPlanilla(letra){
@@ -975,6 +1007,7 @@ function renderJugadores(){
 }
 
 function iniciarPartido(){
+  window.__resumenView = false;
   var rival = rivalInput.value.trim();
   if (!rival){
     rivalInput.focus();
@@ -1320,10 +1353,12 @@ function irResumen(){
         +'</tr>';
     }).join("");
   }
+  var bv=document.getElementById("btnVolver");
+  if (bv) bv.innerHTML = window.__resumenView ? "&#8592; Volver al inicio" : "&#8592; Volver al partido";
   showScreen("screenResumen");
 }
 
-function volverPartido(){ showScreen("screenMatch"); }
+function volverPartido(){ showScreen(window.__resumenView ? "screenSetup" : "screenMatch"); }
 
 function finalizarPartido(){
   var id = getPartidoId();
@@ -1504,6 +1539,7 @@ function checkRecovery(){
 
 function retomarPartido(){
   if (!recoveryData) return;
+  window.__resumenView = false;
   var id=recoveryData.id;
   partido={ rival:recoveryData.rival, fecha:recoveryData.fecha, camada:recoveryData.camada||"", cancha:"", cantT:2, durT:35, nPartido:(/^\d+$/.test(id)?id:"") };
   sbApi("getPartido", { id: id }).then(function(res){
