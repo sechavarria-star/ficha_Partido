@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" id="vp" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Ficha de Partido - CUBA Rugby</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -32,6 +35,7 @@ input,select,textarea{font-size:16px !important;}
 .header-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--white);line-height:1;}
 .header-meta{font-size:13px;color:var(--muted);margin-top:3px;}
 .header-meta:empty{display:none;}
+.app-version{font-size:11px;color:var(--muted);letter-spacing:1px;margin-top:8px;opacity:.65;}
 
 /* CONFIRM MODAL */
 .confirm-modal{max-width:380px;width:100%;text-align:center;padding:28px 22px 22px;border:1.5px solid var(--blue);box-shadow:0 20px 60px rgba(0,0,0,.5);animation:confirmPop .18s ease-out;}
@@ -374,6 +378,7 @@ body.light .zoom-toggle{color:#516686;}
   <div class="setup-logo">
     <div class="club">CUBA RUGBY</div>
     <div class="sub">FICHA DE PARTIDO</div>
+    <div class="app-version" id="appVersion"></div>
   </div>
 
   <div class="recovery-banner" id="recoveryBanner">
@@ -719,6 +724,10 @@ function toggleZoomBar() {
     if (saved) applyZoom(parseInt(saved));
   } catch(e){}
 })();
+
+// ---- VERSIÓN (para verificar que la tablet bajó la última) ----
+var APP_VERSION = "2026-07-09";
+(function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- TEMA (sol/noche) ----
 function toggleTema(){
