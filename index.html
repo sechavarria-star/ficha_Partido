@@ -35,6 +35,11 @@ input,select,textarea{font-size:16px !important;}
 .header-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--white);line-height:1;}
 .header-meta{font-size:13px;color:var(--muted);margin-top:3px;}
 .header-meta:empty{display:none;}
+.db-status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:5px;cursor:pointer;}
+.led{width:9px;height:9px;border-radius:50%;background:#8892a6;flex-shrink:0;transition:background .2s;}
+.led.on{background:#22c55e;box-shadow:0 0 6px #22c55e;}
+.led.off{background:#ef4444;box-shadow:0 0 6px #ef4444;}
+.db-status.stale{color:#fbbf24;}
 .app-version{font-size:11px;color:var(--muted);letter-spacing:1px;margin-top:8px;}
 
 /* CONFIRM MODAL */
@@ -368,6 +373,9 @@ body.light .zoom-toggle{color:#516686;}
       <div class="header-tag">CUBA Rugby</div>
       <div class="header-title" id="headerTitle">Ficha de Partido</div>
       <div class="header-meta" id="headerMeta"></div>
+      <div class="db-status" id="dbStatus" onclick="chequearDB()" title="Estado de conexión con la base — tocá para verificar">
+        <span class="led" id="dbLed"></span><span id="dbText">conectando…</span>
+      </div>
     </div>
     <button id="temaBtn" class="tema-toggle" onclick="toggleTema()" title="Cambiar tema (sol/noche)">&#9728;&#65039;</button>
   </div>
@@ -726,8 +734,42 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-07-09";
+var APP_VERSION = "2026-08-09.1";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
+
+// ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
+var estadoDB = { online:null, lastSync: (parseInt(localStorage.getItem("ficha_lastSync"),10)||0), versionNueva:false };
+
+function haceCuanto(ts){
+  if(!ts) return "";
+  var s=Math.floor((Date.now()-ts)/1000);
+  if(s<10) return "recién";
+  if(s<60) return "hace "+s+"s";
+  var m=Math.floor(s/60); if(m<60) return "hace "+m+" min";
+  var h=Math.floor(m/60); if(h<24) return "hace "+h+" h";
+  return "hace "+Math.floor(h/24)+" d";
+}
+function actualizarDbStatus(){
+  var led=document.getElementById("dbLed"), txt=document.getElementById("dbText"), box=document.getElementById("dbStatus");
+  if(!led||!txt) return;
+  led.className = "led " + (estadoDB.online===true?"on":estadoDB.online===false?"off":"");
+  var estado = estadoDB.online===true?"Base en línea":estadoDB.online===false?"Sin conexión":"conectando…";
+  var ult = estadoDB.lastSync ? " · guardado "+haceCuanto(estadoDB.lastSync) : "";
+  var ver = estadoDB.versionNueva ? "  ⚠ hay versión nueva, recargá" : (" · v"+APP_VERSION);
+  txt.textContent = estado + ult + ver;
+  if(box) box.classList.toggle("stale", estadoDB.versionNueva);
+}
+function marcarSync(){ estadoDB.online=true; estadoDB.lastSync=Date.now(); try{localStorage.setItem("ficha_lastSync",String(estadoDB.lastSync));}catch(e){} actualizarDbStatus(); }
+function chequearDB(){
+  sbApi("getFechas").then(function(){ estadoDB.online=true; actualizarDbStatus(); })
+                    .catch(function(){ estadoDB.online=false; actualizarDbStatus(); });
+}
+// Compara la versión de esta página con la publicada (version.json, sin caché).
+function verificarVersion(){
+  fetch("version.json?ts="+Date.now(), {cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+    if(j && j.version && j.version !== APP_VERSION){ estadoDB.versionNueva=true; actualizarDbStatus(); }
+  }).catch(function(){});
+}
 
 // ---- TEMA (sol/noche) ----
 function toggleTema(){
@@ -773,7 +815,9 @@ function sbApi(action, args){
     method:"POST",
     headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+SB_ANON, "apikey":SB_ANON },
     body: JSON.stringify(Object.assign({action:action}, args||{}))
-  }).then(function(r){ return r.json(); });
+  }).then(function(r){ return r.json(); })
+    .then(function(j){ estadoDB.online=true; actualizarDbStatus(); return j; },
+          function(err){ estadoDB.online=false; actualizarDbStatus(); throw err; });
 }
 function sbParse(file){
   return fetch(FN_PARSE, {
@@ -786,6 +830,9 @@ function sbParse(file){
 checkRecovery();
 (function(){ var h=new Date(); calYear=h.getFullYear(); calMonth=h.getMonth(); fechaSel=_ymd(h.getFullYear(),h.getMonth(),h.getDate()); })();
 cargarFechasConPartidos();               // marca días con partidos, salta al próximo y carga esa fecha
+actualizarDbStatus(); chequearDB(); verificarVersion();
+setInterval(chequearDB, 60000);          // re-chequea conexión cada 1 min
+setInterval(actualizarDbStatus, 30000);  // refresca el "hace X min"
 
 // ---- PLANILLAS (subir PDF -> parsear+guardar en Supabase) ----
 function onPdfsSeleccionados(files){
@@ -1099,7 +1146,7 @@ function toggleTimer(){
     startTimestamp = Date.now() - (timerSecs * 1000);
     if (partido && partido.rival){
       var pid = getPartidoId();
-      if (pid) sbApi("setTimestamp", { nPartido: pid, ts: startTimestamp });
+      if (pid) sbApi("setTimestamp", { nPartido: pid, ts: startTimestamp }).then(function(res){ if(res&&res.ok) marcarSync(); });
     }
     guardarBackupLocal();   // respaldo local con el arranque del cronómetro
     timerInt = setInterval(tickTimer, 1000);
@@ -1552,7 +1599,10 @@ function guardarBackupLocal(){
 }
 function borrarBackupLocal(){ try { localStorage.removeItem("ficha_backup"); } catch(e){} }
 // Sincroniza a Supabase Y guarda copia local (se llama en cada cambio de evento).
-function sincronizar(){ guardarBackupLocal(); sbApi("syncEventos", { partido: partido, eventos: eventos }); }
+function sincronizar(){
+  guardarBackupLocal();
+  sbApi("syncEventos", { partido: partido, eventos: eventos }).then(function(res){ if(res&&res.ok) marcarSync(); });
+}
 
 function checkRecovery(){
   // 1) Respaldo LOCAL (no depende de la red) — prioritario.
