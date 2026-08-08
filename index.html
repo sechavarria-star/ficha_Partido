@@ -12,7 +12,7 @@
 :root{
   --navy:#060e1f;--navy-mid:#111827;--navy-card:#1a2236;
   --blue:#1a4fa0;--blue-light:#2e6fd4;
-  --white:#f0f4ff;--muted:#5a7aaa;--border:#1e3050;
+  --white:#f0f4ff;--muted:#708cb5;--border:#1e3050;
   --green:#0a8f4a;--red:#dc2626;--amber:#d97706;--yellow:#eab308;
   --radius:12px;--radius-sm:8px;
 }
@@ -35,7 +35,7 @@ input,select,textarea{font-size:16px !important;}
 .header-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--white);line-height:1;}
 .header-meta{font-size:13px;color:var(--muted);margin-top:3px;}
 .header-meta:empty{display:none;}
-.app-version{font-size:11px;color:var(--muted);letter-spacing:1px;margin-top:8px;opacity:.65;}
+.app-version{font-size:11px;color:var(--muted);letter-spacing:1px;margin-top:8px;}
 
 /* CONFIRM MODAL */
 .confirm-modal{max-width:380px;width:100%;text-align:center;padding:28px 22px 22px;border:1.5px solid var(--blue);box-shadow:0 20px 60px rgba(0,0,0,.5);animation:confirmPop .18s ease-out;}
@@ -339,7 +339,7 @@ body.light .zoom-toggle{color:#516686;}
 <!-- PIN GATE -->
 <div id="pinGate" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#060e1f 0%,#0d2248 60%,#0a1a3a 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
   <div style="font-family:'Bebas Neue',sans-serif;font-size:40px;letter-spacing:3px;color:#f0f4ff;">CUBA RUGBY</div>
-  <div style="font-size:14px;color:#5a7aaa;letter-spacing:2px;margin-bottom:28px;">FICHA DE PARTIDO</div>
+  <div style="font-size:14px;color:var(--muted);letter-spacing:2px;margin-bottom:28px;">FICHA DE PARTIDO</div>
   <input id="pinInput" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off"
     style="width:200px;max-width:80vw;padding:18px;text-align:center;font-size:24px;letter-spacing:6px;background:#1a2236;border:1.5px solid #1e3050;border-radius:10px;color:#f0f4ff;outline:none;"
     onkeydown="if(event.key==='Enter')checkPin()" />
@@ -750,6 +750,7 @@ var periodo        = "1T";
 var partido        = {};
 var modalData      = {};
 var modalJugSel    = null;   // jugador elegido en el buscador del modal de evento
+var recoveryData   = null;   // partido a retomar (local o Supabase); declarado acá porque checkRecovery corre en el arranque
 var startTimestamp = null;
 var editingIdx     = null;
 var planillaSel    = { nPartido: "", camada: "", cancha: "", equipoLetra: "" };   // planilla A/B/C/D seleccionada
@@ -1005,6 +1006,8 @@ function removeJugador(i){
 
 function renderJugadores(){
   var list = document.getElementById("jugadorList");
+  // Ordenar por número de camiseta (los sin número, al final)
+  jugadores.sort(function(a,b){ return (parseInt(a.num,10)||999) - (parseInt(b.num,10)||999); });
   if (!jugadores.length){ list.innerHTML = ""; return; }
   list.innerHTML = jugadores.map(function(j,i){
     return '<div class="jugador-chip">'
@@ -1098,6 +1101,7 @@ function toggleTimer(){
       var pid = getPartidoId();
       if (pid) sbApi("setTimestamp", { nPartido: pid, ts: startTimestamp });
     }
+    guardarBackupLocal();   // respaldo local con el arranque del cronómetro
     timerInt = setInterval(tickTimer, 1000);
     document.getElementById("btnStartStop").textContent  = "DETENER";
     document.getElementById("btnStartStop").className    = "btn-timer btn-stop";
@@ -1228,7 +1232,7 @@ function confirmarEvento(){
   updateScore();
   renderHistorial();
   if (true){
-    sbApi("syncEventos", { partido: partido, eventos: eventos });
+    sincronizar();
   }
 }
 
@@ -1268,7 +1272,7 @@ function confirmarCambio(){
   closeCambioModal();
   updateScore(); renderHistorial();
   if (true){
-    sbApi("syncEventos", { partido: partido, eventos: eventos });
+    sincronizar();
   }
 }
 
@@ -1381,6 +1385,7 @@ function finalizarPartido(){
       .then(function(){ return sbApi("finalizarPartido", { nPartido: id }); })
       .then(function(res){
         if (res && res.ok){
+          borrarBackupLocal();   // partido cerrado: ya no hace falta el respaldo
           btn.classList.add("done"); btn.innerHTML="&#10004; PARTIDO FINALIZADO";
           st.textContent="Guardado como finalizado.";
         } else {
@@ -1473,7 +1478,7 @@ function onEventBtn(tipo, pts, icon){
     eventos.push({tipo:tipo,pts:pts,icon:icon,jugador:jugLabel,minuto:minStr,periodo:periodo,equipo:activeTeam});
     updateScore(); renderHistorial();
     if (true){
-      sbApi("syncEventos", { partido: partido, eventos: eventos });
+      sincronizar();
     }
   } else {
     openModal(tipo, pts, icon, "CUBA");
@@ -1486,7 +1491,7 @@ function borrarEvento(idx){
   eventos.splice(idx,1);
   updateScore(); renderHistorial();
   if (partidoId && true){
-    sbApi("syncEventos", { partido: partido, eventos: eventos });
+    sincronizar();
   }
 }
 
@@ -1523,7 +1528,7 @@ function confirmarEdicion(){
   closeEditModal(); updateScore(); renderHistorial();
   var partidoId=getPartidoId();
   if (partidoId && true){
-    sbApi("syncEventos", { partido: partido, eventos: eventos });
+    sincronizar();
   }
 }
 
@@ -1533,9 +1538,39 @@ function setEventButtonsEnabled(enabled){
 }
 
 // ---- RECOVERY ----
-var recoveryData = null;
+var ICON_MAP = {"Try":"&#x1F3C9;","Try Penal":"&#x1F3C9;","Conversion":"&#x1F3AF;","Penal":"&#x1F94A;","Drop":"&#x1F91E;","Tarjeta Amarilla":"&#x1F7E8;","Tarjeta Roja":"&#x1F7E5;","Tarjeta Azul":"&#x1F7E6;","Cambio":"&#x1F501;"};
+
+// --- RED DE SEGURIDAD: respaldo del partido en el propio dispositivo ---
+function guardarBackupLocal(){
+  try {
+    if (!partido || !partido.rival) return;
+    localStorage.setItem("ficha_backup", JSON.stringify({
+      partido: partido, eventos: eventos, jugadores: jugadores,
+      startTimestamp: startTimestamp, ts: Date.now()
+    }));
+  } catch(e){}
+}
+function borrarBackupLocal(){ try { localStorage.removeItem("ficha_backup"); } catch(e){} }
+// Sincroniza a Supabase Y guarda copia local (se llama en cada cambio de evento).
+function sincronizar(){ guardarBackupLocal(); sbApi("syncEventos", { partido: partido, eventos: eventos }); }
 
 function checkRecovery(){
+  // 1) Respaldo LOCAL (no depende de la red) — prioritario.
+  try {
+    var raw = localStorage.getItem("ficha_backup");
+    if (raw){
+      var b = JSON.parse(raw);
+      var reciente = b && b.ts && (Date.now()-b.ts) < 6*60*60*1000;   // < 6 h
+      if (b && b.partido && b.partido.rival && reciente && ((b.eventos&&b.eventos.length) || b.startTimestamp)){
+        recoveryData = { local:true, backup:b, rival:b.partido.rival, fecha:b.partido.fecha, camada:b.partido.camada };
+        document.getElementById("recoveryTitle").textContent = "CUBA vs "+String(b.partido.rival).toUpperCase();
+        document.getElementById("recoverySub").textContent   = (b.partido.fecha||"")+(b.partido.camada?" - "+b.partido.camada:"")+" (en este dispositivo)";
+        document.getElementById("recoveryBanner").classList.add("visible");
+        return;
+      }
+    }
+  } catch(e){}
+  // 2) Supabase (partidos sin terminar).
   sbApi("getPartidos").then(function(res){
     if (!res||!res.ok||!res.partidos||!res.partidos.length) return;
     var last=res.partidos[0];
@@ -1546,9 +1581,46 @@ function checkRecovery(){
   }).catch(function(){});
 }
 
+// Aplica un partido restaurado (partido+eventos+jugadores+startTimestamp ya seteados) a la pantalla.
+function _montarPartidoRestaurado(ts){
+  document.getElementById("scoreRivalLabel").textContent = (partido.rival||"").toUpperCase();
+  document.getElementById("headerTitle").textContent   = "CUBA vs "+(partido.rival||"").toUpperCase();
+  document.getElementById("headerMeta").textContent    = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
+  document.getElementById("progressEnd").textContent   = (partido.durT||35)+":00";
+  document.getElementById("progressLabel").textContent = (partido.durT||35)+":00 restantes";
+  document.getElementById("progressBar").style.width   = "0%";
+  buildPeriodoRow(partido.cantT||2);
+  setTeamTab("CUBA"); updateScore(); renderHistorial();
+  showScreen("screenMatch");
+  if (ts){
+    startTimestamp=ts;
+    timerSecs=Math.max(0,Math.floor((Date.now()-ts)/1000));
+    updateTimerDisplay();
+    timerInt=setInterval(tickTimer,1000);
+    document.getElementById("btnStartStop").textContent="DETENER";
+    document.getElementById("btnStartStop").className="btn-timer btn-stop";
+    document.getElementById("timerDisplay").classList.add("running");
+    setEventButtonsEnabled(true);
+  } else { setEventButtonsEnabled(false); }
+}
+
 function retomarPartido(){
   if (!recoveryData) return;
   window.__resumenView = false;
+
+  // Retomar desde el RESPALDO LOCAL (independiente de la red).
+  if (recoveryData.local && recoveryData.backup){
+    var b = recoveryData.backup;
+    partido   = b.partido || {};
+    jugadores = (b.jugadores||[]).map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
+    renderJugadores();
+    eventos   = (b.eventos||[]).map(function(e){ return {tipo:e.tipo,pts:Number(e.pts)||0,icon:e.icon||ICON_MAP[e.tipo]||"&#x1F3C9;",jugador:e.jugador,minuto:e.minuto,periodo:e.periodo,equipo:e.equipo||"CUBA"}; });
+    _montarPartidoRestaurado(b.startTimestamp);
+    sincronizar();   // reintenta subir a Supabase por si se había perdido
+    return;
+  }
+
+  // Retomar desde Supabase.
   var id=recoveryData.id;
   partido={ rival:recoveryData.rival, fecha:recoveryData.fecha, camada:recoveryData.camada||"", cancha:"", cantT:2, durT:35, nPartido:(/^\d+$/.test(id)?id:"") };
   sbApi("getPartido", { id: id }).then(function(res){
