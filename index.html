@@ -734,7 +734,7 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-08-09.2";
+var APP_VERSION = "2026-08-09.3";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
@@ -1213,17 +1213,24 @@ function updateProgress(){
   }
 }
 
-function setPeriodo(p){
-  var orden = {"1T":1,"2T":2,"3T":3};
-  var avanza = (orden[p]||0) > (orden[periodo]||0);   // pasar a un tiempo posterior
+function _aplicarPeriodo(p){
   periodo = p;
   document.querySelectorAll(".periodo-btn").forEach(function(btn){ btn.classList.remove("active"); });
   var codes=["1T","2T","3T"], ids=["btn1T","btn2T","btn3T"];
   for (var i=0;i<codes.length;i++){
     if (codes[i]===p){ var el=document.getElementById(ids[i]); if(el) el.classList.add("active"); }
   }
-  // Al avanzar de tiempo (ej. 1er→2do): reloj a 00:00 y listo para arrancar, sin pedir reset.
-  if (avanza) _resetClock();
+}
+function setPeriodo(p){
+  var orden = {"1T":1,"2T":2,"3T":3}, labels = {"1T":"1er","2T":"2do","3T":"3er"};
+  var avanza = (orden[p]||0) > (orden[periodo]||0);   // pasar a un tiempo posterior
+  if (avanza){
+    // Confirmar (por si se toca sin querer): al pasar de tiempo se reinicia el reloj.
+    mostrarConfirm("¿Pasar al "+(labels[p]||p)+" tiempo? El cronómetro se reinicia a 00:00 (no borra las incidencias).",
+      function(){ _aplicarPeriodo(p); _resetClock(); }, "&#9202;&#65039;");
+    return;
+  }
+  _aplicarPeriodo(p);   // volver atrás / mismo: solo cambia la etiqueta, sin reset
 }
 
 // ---- MODAL EVENTO ----
