@@ -734,7 +734,7 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-08-09.1";
+var APP_VERSION = "2026-08-09.2";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
@@ -1161,21 +1161,23 @@ function toggleTimer(){
 document.addEventListener("visibilitychange", function(){ if (!document.hidden && timerInt) tickTimer(); });
 window.addEventListener("focus", function(){ if (timerInt) tickTimer(); });
 
+// Reset del cronómetro a 00:00 (sin confirmar). No borra las incidencias.
+function _resetClock(){
+  clearInterval(timerInt); timerInt = null;
+  timerSecs = 0; startTimestamp = null;
+  updateTimerDisplay();
+  document.getElementById("btnStartStop").textContent = "INICIAR";
+  document.getElementById("btnStartStop").className   = "btn-timer btn-start";
+  document.getElementById("timerDisplay").classList.remove("running");
+  document.getElementById("timerDisplay").classList.remove("overtime");
+  setEventButtonsEnabled(false);
+  var bar = document.getElementById("progressBar");
+  if (bar){ bar.style.width="0%"; bar.className="progress-bar"; }
+  var lbl = document.getElementById("progressLabel");
+  if (lbl && partido && partido.durT){ lbl.textContent = partido.durT+":00 restantes"; lbl.className="progress-label"; }
+}
 function resetTimer(){
-  mostrarConfirm("¿Reiniciar el cronómetro a 00:00? (no borra las incidencias)", function(){
-    clearInterval(timerInt); timerInt = null;
-    timerSecs = 0; startTimestamp = null;
-    updateTimerDisplay();
-    document.getElementById("btnStartStop").textContent = "INICIAR";
-    document.getElementById("btnStartStop").className   = "btn-timer btn-start";
-    document.getElementById("timerDisplay").classList.remove("running");
-    document.getElementById("timerDisplay").classList.remove("overtime");
-    setEventButtonsEnabled(false);
-    var bar = document.getElementById("progressBar");
-    if (bar){ bar.style.width="0%"; bar.className="progress-bar"; }
-    var lbl = document.getElementById("progressLabel");
-    if (lbl && partido && partido.durT){ lbl.textContent = partido.durT+":00 restantes"; lbl.className="progress-label"; }
-  }, "&#128260;");
+  mostrarConfirm("¿Reiniciar el cronómetro a 00:00? (no borra las incidencias)", _resetClock, "&#128260;");
 }
 
 function updateTimerDisplay(){
@@ -1212,12 +1214,16 @@ function updateProgress(){
 }
 
 function setPeriodo(p){
+  var orden = {"1T":1,"2T":2,"3T":3};
+  var avanza = (orden[p]||0) > (orden[periodo]||0);   // pasar a un tiempo posterior
   periodo = p;
   document.querySelectorAll(".periodo-btn").forEach(function(btn){ btn.classList.remove("active"); });
   var codes=["1T","2T","3T"], ids=["btn1T","btn2T","btn3T"];
   for (var i=0;i<codes.length;i++){
     if (codes[i]===p){ var el=document.getElementById(ids[i]); if(el) el.classList.add("active"); }
   }
+  // Al avanzar de tiempo (ej. 1er→2do): reloj a 00:00 y listo para arrancar, sin pedir reset.
+  if (avanza) _resetClock();
 }
 
 // ---- MODAL EVENTO ----
@@ -1613,6 +1619,9 @@ function checkRecovery(){
       var reciente = b && b.ts && (Date.now()-b.ts) < 6*60*60*1000;   // < 6 h
       if (b && b.partido && b.partido.rival && reciente && ((b.eventos&&b.eventos.length) || b.startTimestamp)){
         recoveryData = { local:true, backup:b, rival:b.partido.rival, fecha:b.partido.fecha, camada:b.partido.camada };
+        // Si el reloj estaba corriendo (refresco accidental en pleno partido) → retomar DIRECTO.
+        if (b.startTimestamp){ retomarPartido(); return; }
+        // Si no había arrancado, ofrecer con el banner (elegir retomar o nuevo).
         document.getElementById("recoveryTitle").textContent = "CUBA vs "+String(b.partido.rival).toUpperCase();
         document.getElementById("recoverySub").textContent   = (b.partido.fecha||"")+(b.partido.camada?" - "+b.partido.camada:"")+" (en este dispositivo)";
         document.getElementById("recoveryBanner").classList.add("visible");
