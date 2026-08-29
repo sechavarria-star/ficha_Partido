@@ -300,6 +300,7 @@ input,select,textarea{font-size:16px !important;}
 
 /* ============ TEMA SOL (claro, alto contraste para el sol) ============ */
 .header-row{justify-content:space-between;}
+.header-btns{display:flex;gap:8px;flex-shrink:0;}
 .tema-toggle{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:50%;width:40px;height:40px;font-size:20px;line-height:1;cursor:pointer;flex-shrink:0;color:#fff;}
 
 body.light{
@@ -377,7 +378,10 @@ body.light .zoom-toggle{color:#516686;}
         <span class="led" id="dbLed"></span><span id="dbText">conectando…</span>
       </div>
     </div>
-    <button id="temaBtn" class="tema-toggle" onclick="toggleTema()" title="Cambiar tema (sol/noche)">&#9728;&#65039;</button>
+    <div class="header-btns">
+      <button id="homeBtn" class="tema-toggle" onclick="irAlInicio()" title="Ir al inicio">&#127968;</button>
+      <button id="temaBtn" class="tema-toggle" onclick="toggleTema()" title="Cambiar tema (sol/noche)">&#9728;&#65039;</button>
+    </div>
   </div>
 </header>
 
@@ -608,20 +612,14 @@ body.light .zoom-toggle{color:#516686;}
   <div class="modal">
     <div class="modal-title">&#x1F501; &nbsp;Registrar cambio</div>
     <div class="modal-field">
-      <div class="modal-label">Sale</div>
-      <select id="cambioSale"><option value="">-- Seleccionar --</option></select>
+      <div class="modal-label">Sale (nombre o número)</div>
+      <input type="text" id="cambioSaleBuscar" placeholder="Empezá a escribir…" autocomplete="off" oninput="filtrarCambioSale(this.value)" />
+      <div class="sugerencias" id="cambioSaleSug"></div>
     </div>
     <div class="modal-field">
-      <div class="modal-label">O número que sale</div>
-      <input type="text" inputmode="numeric" id="cambioSaleNum" placeholder="Ej: 8" autocomplete="off" />
-    </div>
-    <div class="modal-field">
-      <div class="modal-label">Entra</div>
-      <select id="cambioEntra"><option value="">-- Seleccionar --</option></select>
-    </div>
-    <div class="modal-field">
-      <div class="modal-label">O número que entra</div>
-      <input type="text" inputmode="numeric" id="cambioEntraNum" placeholder="Ej: 18" autocomplete="off" />
+      <div class="modal-label">Entra (nombre o número)</div>
+      <input type="text" id="cambioEntraBuscar" placeholder="Empezá a escribir…" autocomplete="off" oninput="filtrarCambioEntra(this.value)" />
+      <div class="sugerencias" id="cambioEntraSug"></div>
     </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeCambioModal()">Cancelar</button>
@@ -734,7 +732,7 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-08-09.3";
+var APP_VERSION = "2026-08-09.4";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
@@ -1244,20 +1242,29 @@ function openModal(tipo, pts, icon, equipo){
 }
 
 // Filtra el roster en vivo por nombre o número mientras se escribe.
-function filtrarJugadores(q){
-  modalJugSel = null;                 // tipear anula una selección previa
-  var cont = document.getElementById("modalSugerencias");
+// Renderiza en `sugId` las coincidencias del roster (por nombre o número); cada una llama onclickFn(i).
+function _renderSug(q, sugId, onclickFn){
+  var cont = document.getElementById(sugId);
   q = (q||"").trim().toLowerCase();
   if (!q){ cont.innerHTML = ""; return; }
   var res = [];
   for (var i=0; i<jugadores.length && res.length<8; i++){
     var j = jugadores[i];
     if ((j.nom||"").toLowerCase().indexOf(q) >= 0 || String(j.num).indexOf(q) >= 0){
-      res.push('<div class="sug-item" onclick="seleccionarJugadorModal('+i+')"><span class="sug-num">'+j.num+'</span>'+j.nom+'</div>');
+      res.push('<div class="sug-item" onclick="'+onclickFn+'('+i+')"><span class="sug-num">'+j.num+'</span>'+j.nom+'</div>');
     }
   }
   cont.innerHTML = res.length ? res.join("") : '<div class="sug-empty">Sin coincidencias — se guarda lo que escribas</div>';
 }
+// Label de un jugador elegido, o del texto tipeado (número → #N; si no, texto libre).
+function _labelJug(sel, inputId){
+  if (sel) return "#"+sel.num+" "+sel.nom;
+  var t = document.getElementById(inputId).value.trim();
+  if (!t) return "";
+  return /^\d+$/.test(t) ? ("#"+t) : t;
+}
+
+function filtrarJugadores(q){ modalJugSel = null; _renderSug(q, "modalSugerencias", "seleccionarJugadorModal"); }
 
 function seleccionarJugadorModal(i){
   modalJugSel = jugadores[i];
@@ -1297,15 +1304,19 @@ function confirmarEvento(){
 }
 
 // ---- MODAL CAMBIO ----
+var cambioSaleSel = null, cambioEntraSel = null;
 function openCambioModal(){
-  var opts='<option value="">-- Seleccionar --</option>';
-  jugadores.forEach(function(j,i){ opts+='<option value="'+i+'">#'+j.num+' '+j.nom+'</option>'; });
-  document.getElementById("cambioSale").innerHTML  = opts;
-  document.getElementById("cambioEntra").innerHTML = opts;
-  document.getElementById("cambioSaleNum").value  = "";
-  document.getElementById("cambioEntraNum").value = "";
+  cambioSaleSel = null; cambioEntraSel = null;
+  document.getElementById("cambioSaleBuscar").value  = "";
+  document.getElementById("cambioEntraBuscar").value = "";
+  document.getElementById("cambioSaleSug").innerHTML  = "";
+  document.getElementById("cambioEntraSug").innerHTML = "";
   document.getElementById("cambioModalOverlay").classList.add("open");
 }
+function filtrarCambioSale(q){  cambioSaleSel  = null; _renderSug(q, "cambioSaleSug",  "selCambioSale"); }
+function filtrarCambioEntra(q){ cambioEntraSel = null; _renderSug(q, "cambioEntraSug", "selCambioEntra"); }
+function selCambioSale(i){  cambioSaleSel  = jugadores[i]; document.getElementById("cambioSaleBuscar").value  = "#"+jugadores[i].num+" "+jugadores[i].nom; document.getElementById("cambioSaleSug").innerHTML  = ""; }
+function selCambioEntra(i){ cambioEntraSel = jugadores[i]; document.getElementById("cambioEntraBuscar").value = "#"+jugadores[i].num+" "+jugadores[i].nom; document.getElementById("cambioEntraSug").innerHTML = ""; }
 
 function closeCambioModal(){
   document.getElementById("cambioModalOverlay").classList.remove("open");
@@ -1313,17 +1324,9 @@ function closeCambioModal(){
   setTimeout(function(){ window.scrollTo(0,0); }, 100);
 }
 
-function jugLabelFrom_(selId, numId){
-  var sel = document.getElementById(selId).value;
-  var num = document.getElementById(numId).value.trim();
-  if (sel !== ""){ var j=jugadores[parseInt(sel)]; return "#"+j.num+" "+j.nom; }
-  if (num) return "#"+num;
-  return "";
-}
-
 function confirmarCambio(){
-  var sale  = jugLabelFrom_("cambioSale","cambioSaleNum");
-  var entra = jugLabelFrom_("cambioEntra","cambioEntraNum");
+  var sale  = _labelJug(cambioSaleSel,  "cambioSaleBuscar");
+  var entra = _labelJug(cambioEntraSel, "cambioEntraBuscar");
   if (!sale && !entra) return;
   var label = "Sale "+(sale||"?")+"  ->  Entra "+(entra||"?");
   var m=Math.floor(timerSecs/60), s=timerSecs%60;
@@ -1331,9 +1334,7 @@ function confirmarCambio(){
   eventos.push({ tipo:"Cambio", pts:0, icon:"&#x1F501;", jugador:label, minuto:minStr, periodo:periodo, equipo:"CUBA" });
   closeCambioModal();
   updateScore(); renderHistorial();
-  if (true){
-    sincronizar();
-  }
+  sincronizar();
 }
 
 // ---- SCORE ----
@@ -1433,6 +1434,26 @@ function irResumen(){
 
 function volverPartido(){ showScreen(window.__resumenView ? "screenSetup" : "screenMatch"); }
 
+// Botón 🏠 del header: vuelve al inicio desde cualquier pantalla.
+function irAlInicio(){
+  if (document.getElementById("screenSetup").classList.contains("active")) return;
+  var go = function(){
+    clearInterval(timerInt); timerInt=null;   // frena el tick (el partido queda guardado por startTimestamp/backup)
+    window.__resumenView = false;
+    document.getElementById("headerTitle").textContent = "Ficha de Partido";
+    document.getElementById("headerMeta").textContent = "";
+    showScreen("screenSetup");
+    cargarFechasConPartidos();                // refresca los partidos del día
+  };
+  // Si hay un partido sin finalizar en curso, confirmar (queda guardado igual).
+  var enCurso = !!timerInt || (eventos && eventos.length && localStorage.getItem("ficha_backup"));
+  if (enCurso){
+    mostrarConfirm("¿Ir al inicio? El partido queda guardado y lo podés retomar.", go, "&#127968;");
+  } else {
+    go();
+  }
+}
+
 function finalizarPartido(){
   var id = getPartidoId();
   var btn = document.getElementById("btnFinalizar");
@@ -1446,6 +1467,9 @@ function finalizarPartido(){
       .then(function(res){
         if (res && res.ok){
           borrarBackupLocal();   // partido cerrado: ya no hace falta el respaldo
+          clearInterval(timerInt); timerInt=null;   // frenar el reloj
+          window.__resumenView = true;              // "Volver" ahora lleva al inicio
+          var bv=document.getElementById("btnVolver"); if(bv) bv.innerHTML="&#8592; Ir al inicio";
           btn.classList.add("done"); btn.innerHTML="&#10004; PARTIDO FINALIZADO";
           st.textContent="Guardado como finalizado.";
         } else {
