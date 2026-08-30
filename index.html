@@ -75,10 +75,15 @@ input,select,textarea{font-size:16px !important;}
 .jugador-add input::placeholder{color:var(--muted);}
 .btn-add{padding:20px 22px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;cursor:pointer;flex-shrink:0;}
 .jugador-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
-.jugador-chip{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.jugador-chip{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--navy-card);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;}
 .jugador-chip .num{width:40px;height:40px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;}
 .jugador-chip .name{flex:1;font-size:20px;}
 .jugador-chip .del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:24px;padding:0 4px;}
+.jugador-chip.es-titular{border-color:var(--green);background:rgba(10,143,74,.12);}
+.jugador-chip .tit-badge{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--green);border:1px solid var(--green);border-radius:10px;padding:3px 8px;flex-shrink:0;display:none;}
+.jugador-chip.es-titular .tit-badge{display:inline-block;}
+.titulares-count{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:var(--muted);letter-spacing:0;}
+.jugador-hint{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.4;}
 .btn-primary{width:100%;padding:24px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;cursor:pointer;display:block;margin-top:20px;margin-bottom:80px;}
 
 /* PLANILLA CARD */
@@ -437,7 +442,8 @@ body.light .zoom-toggle{color:#516686;}
     <div id="planillaBadge"></div>
   </div>
 
-  <div class="section-title">Jugadores CUBA</div>
+  <div class="section-title">Jugadores CUBA <span class="titulares-count" id="titularesCount"></span></div>
+  <div class="jugador-hint">Tocá un jugador para marcarlo <b>titular</b> (arranca en cancha). Los demás quedan como suplentes.</div>
   <div class="jugador-add">
     <input id="jugNumInput" type="text" inputmode="numeric" placeholder="#" style="max-width:64px;" autocomplete="off" />
     <input id="jugNomInput" type="text" inputmode="text" placeholder="Apellido, Nombre" autocomplete="off" />
@@ -580,6 +586,13 @@ body.light .zoom-toggle{color:#516686;}
         <th>Min</th><th>T</th><th>Evento</th><th>Jugador</th><th>Pts</th>
       </tr></thead>
       <tbody id="resumenBody"></tbody>
+    </table>
+  </div>
+  <div class="resumen-card" id="resumenMinutosCard" style="display:none;">
+    <div class="resumen-teams" style="font-size:18px;margin-bottom:8px;">Minutos por jugador</div>
+    <table class="resumen-table">
+      <thead><tr><th>Jugador</th><th style="text-align:right;">Min</th><th style="text-align:right;">Pts</th></tr></thead>
+      <tbody id="resumenMinutos"></tbody>
     </table>
   </div>
   <div class="export-btns">
@@ -732,7 +745,7 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-08-09.4";
+var APP_VERSION = "2026-08-09.5";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
@@ -1006,7 +1019,7 @@ function aplicarPlanilla(letra){
   if (!e) return;
   rivalInput.value  = e.rival || "";
   if (e.fecha)  fechaSel = e.fecha;
-  jugadores = (e.jugadores||[]).map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
+  jugadores = (e.jugadores||[]).map(function(j){ var n=parseInt(j.num,10); return {num:j.num||"?", nom:j.nom, dni:j.dni||"", titular:(n>=1 && n<=15)}; });
   renderJugadores();
   planillaSel = { nPartido: e.nPartido || "", camada: e.camada || "", cancha: e.cancha || "", equipoLetra: e.equipoLetra || letra };
   ["A","B","C","D"].forEach(function(L){
@@ -1053,14 +1066,21 @@ function renderJugadores(){
   var list = document.getElementById("jugadorList");
   // Ordenar por número de camiseta (los sin número, al final)
   jugadores.sort(function(a,b){ return (parseInt(a.num,10)||999) - (parseInt(b.num,10)||999); });
+  var cont = document.getElementById("titularesCount");
+  var nTit = jugadores.filter(function(j){ return j.titular; }).length;
+  if (cont) cont.textContent = jugadores.length ? ("— "+nTit+" titular"+(nTit===1?"":"es")) : "";
   if (!jugadores.length){ list.innerHTML = ""; return; }
   list.innerHTML = jugadores.map(function(j,i){
-    return '<div class="jugador-chip">'
+    return '<div class="jugador-chip'+(j.titular?' es-titular':'')+'" onclick="toggleTitular('+i+')">'
       + '<div class="num">'+j.num+'</div>'
       + '<div class="name">'+j.nom+'</div>'
-      + '<button class="del" onclick="removeJugador('+i+')">x</button>'
+      + '<span class="tit-badge">TITULAR</span>'
+      + '<button class="del" onclick="event.stopPropagation(); removeJugador('+i+')">x</button>'
       + '</div>';
   }).join("");
+}
+function toggleTitular(i){
+  if (jugadores[i]){ jugadores[i].titular = !jugadores[i].titular; renderJugadores(); }
 }
 
 function iniciarPartido(){
@@ -1074,7 +1094,8 @@ function iniciarPartido(){
   }
   var cantT = parseInt(document.getElementById("cantTiemposInput").value) || 2;
   var durT  = parseInt(document.getElementById("durTiempoInput").value)  || 35;
-  partido = { rival:rival, fecha:fechaSel, cancha:planillaSel.cancha||"", camada:planillaSel.camada||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"", equipoLetra:planillaSel.equipoLetra||"" };
+  partido = { rival:rival, fecha:fechaSel, cancha:planillaSel.cancha||"", camada:planillaSel.camada||"", cantT:cantT, durT:durT, nPartido:planillaSel.nPartido||"", equipoLetra:planillaSel.equipoLetra||"",
+              titulares: jugadores.filter(function(j){return j.titular;}).map(function(j){return "#"+j.num+" "+j.nom;}) };
   document.getElementById("scoreRivalLabel").textContent = rival.toUpperCase();
   document.getElementById("headerTitle").textContent   = "CUBA vs "+rival.toUpperCase();
   document.getElementById("headerMeta").textContent    = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
@@ -1395,6 +1416,46 @@ function renderHistorial(){
 }
 
 // ---- RESUMEN ----
+// Minuto absoluto del partido (según período y duración por tiempo).
+function _absMin(e){
+  var p = {"1T":0,"2T":1,"3T":2}[e.periodo] || 0;
+  var mm = parseInt(String(e.minuto||"0:0").split(":")[0],10) || 0;
+  return p*(partido.durT||35) + mm;
+}
+// Calcula minutos jugados + puntos por jugador (titulares desde 0, cambios por su minuto).
+function calcularMinutos(){
+  var durTotal = (partido.cantT||2) * (partido.durT||35);
+  var enCancha = {}, min = {}, pts = {}, orden = [];
+  function reg(l){ if(min[l]===undefined){ min[l]=0; orden.push(l); } }
+  (partido.titulares||[]).forEach(function(t){ reg(t); enCancha[t]=0; });
+  eventos.forEach(function(e){ if(e.equipo!=="RIVAL" && (e.pts||0)>0){ var k=(e.jugador||"").trim(); if(k){ reg(k); pts[k]=(pts[k]||0)+e.pts; } } });
+  eventos.filter(function(e){return e.tipo==="Cambio";}).slice()
+    .sort(function(a,b){return _absMin(a)-_absMin(b);})
+    .forEach(function(c){
+      var m=_absMin(c), mt=/Sale\s+(.+?)\s*->\s*Entra\s+(.+)/.exec(c.jugador||"");
+      if(!mt) return;
+      var sale=mt[1].trim(), entra=mt[2].trim();
+      if(enCancha[sale]!==undefined){ reg(sale); min[sale]+=(m-enCancha[sale]); delete enCancha[sale]; }
+      if(entra && entra!=="?"){ reg(entra); if(enCancha[entra]===undefined) enCancha[entra]=m; }
+    });
+  Object.keys(enCancha).forEach(function(k){ min[k]+=(durTotal-enCancha[k]); });
+  return orden.map(function(l){ return { jugador:l, minutos:Math.max(0,Math.round(min[l]||0)), puntos:pts[l]||0 }; })
+              .sort(function(a,b){ return b.minutos-a.minutos || b.puntos-a.puntos; });
+}
+function renderMinutos(){
+  var card = document.getElementById("resumenMinutosCard"), body = document.getElementById("resumenMinutos");
+  if (!card || !body) return;
+  var hayTit = partido.titulares && partido.titulares.length;
+  if (!hayTit){ card.style.display="none"; return; }
+  var filas = calcularMinutos();
+  if (!filas.length){ card.style.display="none"; return; }
+  card.style.display="";
+  body.innerHTML = filas.map(function(f){
+    return '<tr><td>'+f.jugador+'</td><td style="text-align:right;font-weight:600;">'+f.minutos+"'</td>"
+         + '<td class="tag-pts'+(f.puntos?'':' cero')+'" style="text-align:right;">'+(f.puntos||'--')+'</td></tr>';
+  }).join("");
+}
+
 function irResumen(){
   var fb=document.getElementById("btnFinalizar");
   fb.disabled=false; fb.classList.remove("done"); fb.innerHTML="&#10004; FINALIZAR PARTIDO";
@@ -1427,6 +1488,7 @@ function irResumen(){
         +'</tr>';
     }).join("");
   }
+  renderMinutos();
   var bv=document.getElementById("btnVolver");
   if (bv) bv.innerHTML = window.__resumenView ? "&#8592; Volver al inicio" : "&#8592; Volver al partido";
   showScreen("screenResumen");
