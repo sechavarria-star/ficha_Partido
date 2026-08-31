@@ -745,7 +745,7 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-08-29.1";
+var APP_VERSION = "2026-08-31.1";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
@@ -821,12 +821,10 @@ var SB_ANON  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 var FN_PARSE = SB_URL + "/functions/v1/parse-planilla";
 var FN_API   = SB_URL + "/functions/v1/ficha-api";
 
-// ---- TABLERO DE MINUTOS (Apps Script "Resume de Partidos") ----
-// Al finalizar, el partido jugado en vivo se manda a la misma hoja que llena el
-// lector de PDFs (pestañas PARTIDOS + PARTICIPACIONES), así los dashboards de
-// minutos se encienden sin esperar el PDF. Web App bound a la hoja (cuenta CUBA).
-var SYNC_MINUTOS_URL   = "https://script.google.com/macros/s/AKfycbxFoGrKdqe6opLLbiCMe_7wKuxQghd5vQomux0b2VTzAxwO0SqX7F2bi3Aeq4cPiu6I/exec";
-var SYNC_MINUTOS_TOKEN = "cuba-ficha-7f3a9c2e";
+// ---- TABLERO DE MINUTOS ----
+// Al finalizar, el partido en vivo guarda sus minutos/puntos por jugador en
+// Supabase (acción syncParticipaciones de ficha-api). El tablero minutos-gs lee
+// de ahí. Supabase es la fuente única; la hoja "Resume de Partidos" queda de respaldo.
 
 function sbApi(action, args){
   return fetch(FN_API, {
@@ -1523,41 +1521,35 @@ function irAlInicio(){
   }
 }
 
-// Manda el partido finalizado al tablero de minutos (hoja "Resume de Partidos").
-// Fire-and-forget: no-cors + text/plain (así el POST llega al doPost sin CORS).
+// Guarda los minutos/puntos por jugador del partido finalizado en Supabase
+// (acción syncParticipaciones). El tablero minutos-gs lo lee de ahí.
 function enviarMinutosATablero(){
   try{
-    if (!SYNC_MINUTOS_URL) return;
     var id = getPartidoId();
     if (!id) return;
     updateScore();
     var r = resultadoActual || { cuba:0, rival:0 };
     var equipoCuba = partido.equipoLetra ? ("CUBA "+partido.equipoLetra) : "CUBA";
-    var parts = calcularMinutos().map(function(f){
+    var rival = partido.rival || "Rival";
+    var participaciones = calcularMinutos().map(function(f){
       var m = /^#(\d+)\s+([\s\S]+)$/.exec(f.jugador||"");
-      return { dorsal:  m ? parseInt(m[1],10) : "",
+      return { equipo:  equipoCuba,
+               dorsal:  m ? parseInt(m[1],10) : "",
                jugador: m ? m[2].trim() : (f.jugador||""),
-               minutos: f.minutos, puntos: f.puntos };
+               minutos: f.minutos, puntos: f.puntos, origen:"vivo" };
     });
-    var payload = {
-      token: SYNC_MINUTOS_TOKEN,
-      matchId: id,
-      fecha: (partido.fecha||"").substring(0,10),
-      equipoCuba: equipoCuba,
-      rival: partido.rival || "Rival",
-      scoreCuba: r.cuba || 0,
-      scoreRival: r.rival || 0,
-      fichaUrl: location.origin + location.pathname,
-      participaciones: parts
+    var resultado = {
+      nPartido: id,
+      fecha: (partido.fecha||"").substring(0,10) || null,
+      local: equipoCuba, visitante: rival,
+      resultado: equipoCuba+" "+(r.cuba||0)+" - "+rival+" "+(r.rival||0),
+      origen: "vivo"
     };
-    fetch(SYNC_MINUTOS_URL, {
-      method:"POST", mode:"no-cors",
-      headers:{ "Content-Type":"text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    }).then(function(){
-      var st=document.getElementById("finalizarStatus");
-      if(st) st.textContent = "Guardado como finalizado. Minutos enviados al tablero.";
-    }).catch(function(){});
+    sbApi("syncParticipaciones", { resultado: resultado, participaciones: participaciones })
+      .then(function(res){
+        var st=document.getElementById("finalizarStatus");
+        if(st && res && res.ok) st.textContent = "Guardado como finalizado. Minutos enviados al tablero.";
+      }).catch(function(){});
   }catch(e){}
 }
 
