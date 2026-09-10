@@ -1378,12 +1378,13 @@ function updateScore(){
   document.getElementById("triesCuba").textContent  = triesCuba  + (triesCuba===1?" try":" tries");
   document.getElementById("triesRival").textContent = triesRival + (triesRival===1?" try":" tries");
 
-  // Punto bonus por equipo: ofensivo (3+ tries de diferencia) + defensivo (pierde por <=7).
-  // bonusOfCuba/bonusDefCuba son la fuente de verdad: se mandan tal cual al tablero
-  // minutos-gs al finalizar (enviarMinutosATablero), que NO recalcula nada — así la
-  // regla vive en un solo lugar y no se puede desincronizar entre los dos sistemas.
-  var bonusOfCuba  = (triesCuba - triesRival) >= 3;
-  var bonusOfRival = (triesRival - triesCuba) >= 3;
+  // Punto bonus por equipo: ofensivo (equipo GANADOR con 3+ tries de diferencia)
+  // + defensivo (pierde por <=7). bonusOfCuba/bonusDefCuba son la fuente de
+  // verdad: se mandan tal cual al tablero minutos-gs al finalizar
+  // (enviarMinutosATablero), que NO recalcula nada — así la regla vive en un
+  // solo lugar y no se puede desincronizar entre los dos sistemas.
+  var bonusOfCuba  = (cuba > rival) && (triesCuba - triesRival) >= 3;
+  var bonusOfRival = (rival > cuba) && (triesRival - triesCuba) >= 3;
   var bonusDefCuba  = (cuba < rival && (rival - cuba) <= 7);   // CUBA perdió por <=7
   var bonusDefRival = (rival < cuba && (cuba - rival) <= 7);   // RIVAL perdió por <=7
   var bonusCuba  = (bonusOfCuba  ? 1 : 0) + (bonusDefCuba  ? 1 : 0);
