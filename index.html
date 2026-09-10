@@ -1386,7 +1386,8 @@ function updateScore(){
   if (rival < cuba && (cuba - rival) <= 7) bonusRival++;   // RIVAL perdió por <=7
   pintarBonus("bonusCuba", bonusCuba);
   pintarBonus("bonusRival", bonusRival);
-  resultadoActual = { cuba:cuba, rival:rival, bonusCuba:bonusCuba, bonusRival:bonusRival };
+  resultadoActual = { cuba:cuba, rival:rival, bonusCuba:bonusCuba, bonusRival:bonusRival,
+                       triesCuba:triesCuba, triesRival:triesRival };
 }
 
 function pintarBonus(id, n){
@@ -1543,7 +1544,11 @@ function enviarMinutosATablero(){
       fecha: (partido.fecha||"").substring(0,10) || null,
       local: equipoCuba, visitante: rival,
       resultado: equipoCuba+" "+(r.cuba||0)+" - "+rival+" "+(r.rival||0),
-      origen: "vivo"
+      origen: "vivo",
+      // Tries por equipo, para que el tablero minutos-gs calcule el punto
+      // bonus ofensivo (4+ tries / diferencia de 3+ tries). Ver ficha-api.
+      triesCuba: (r.triesCuba != null ? r.triesCuba : null),
+      triesRival: (r.triesRival != null ? r.triesRival : null)
     };
     sbApi("syncParticipaciones", { resultado: resultado, participaciones: participaciones })
       .then(function(res){
