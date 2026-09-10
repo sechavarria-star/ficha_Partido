@@ -195,6 +195,50 @@ Deno.serve(async (req: Request) => {
         return json({ ok: true, fechas: Array.from(set) });
       }
 
+      case "syncParticipaciones": {
+        // Vuelca minutos/puntos por jugador + resultado de un partido a las
+        // tablas de consolidación (usado por la migración y por la Ficha al finalizar).
+        const r = args.resultado || {};
+        const id = String(r.nPartido || "");
+        if (!id) return json({ error: "sin nPartido" }, 400);
+
+        // tries_cuba/tries_rival: para que minutos-gs calcule el punto bonus
+        // ofensivo (4+ tries / diferencia de 3+). Null en partidos viejos o si
+        // el cliente no los manda (compatible con clientes previos a esto).
+        const tc = r.triesCuba;
+        const tr = r.triesRival;
+        const up = await sb.from("ficha_partido_resultados").upsert({
+          n_partido: id,
+          fecha: r.fecha || null,
+          local: r.local || "",
+          visitante: r.visitante || "",
+          resultado: r.resultado || "",
+          origen: r.origen || "vivo",
+          tries_cuba: (tc === undefined || tc === null) ? null : Number(tc),
+          tries_rival: (tr === undefined || tr === null) ? null : Number(tr),
+        }, { onConflict: "n_partido" });
+        if (up.error) return json({ error: "resultado: " + up.error.message }, 500);
+
+        // Reemplazo idempotente de las participaciones del partido.
+        await sb.from("ficha_partido_participaciones").delete().eq("n_partido", id);
+        const parts = (args.participaciones || []) as any[];
+        if (parts.length) {
+          const rows = parts.map((p) => ({
+            n_partido: id,
+            fecha: r.fecha || null,
+            equipo: p.equipo || r.equipo || "",
+            dorsal: p.dorsal !== undefined && p.dorsal !== null && p.dorsal !== "" ? Number(p.dorsal) : null,
+            jugador: p.jugador || "",
+            minutos: Number(p.minutos || 0),
+            puntos: Number(p.puntos || 0),
+            origen: p.origen || r.origen || "vivo",
+          }));
+          const ins = await sb.from("ficha_partido_participaciones").insert(rows);
+          if (ins.error) return json({ error: "participaciones: " + ins.error.message }, 500);
+        }
+        return json({ ok: true, n: parts.length });
+      }
+
       default:
         return json({ error: "acción desconocida: " + action }, 400);
     }
