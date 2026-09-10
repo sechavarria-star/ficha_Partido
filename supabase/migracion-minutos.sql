@@ -57,3 +57,11 @@ create policy ficha_partido_resultados_read
 alter table ficha_partido_resultados
   add column if not exists tries_cuba  integer,
   add column if not exists tries_rival integer;
+
+-- 2026-09-10 (2): bonus YA RESUELTO por la Ficha (misma fórmula de updateScore,
+-- una sola fuente de verdad) en vez de que minutos-gs recalcule con tries_cuba/
+-- tries_rival. Boolean nullable: null = no informado (partido viejo o cliente
+-- desactualizado), NO se interpreta como "sin bonus".
+alter table ficha_partido_resultados
+  add column if not exists bonus_ofensivo  boolean,
+  add column if not exists bonus_defensivo boolean;

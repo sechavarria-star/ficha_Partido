@@ -202,9 +202,11 @@ Deno.serve(async (req: Request) => {
         const id = String(r.nPartido || "");
         if (!id) return json({ error: "sin nPartido" }, 400);
 
-        // tries_cuba/tries_rival: para que minutos-gs calcule el punto bonus
-        // ofensivo (4+ tries / diferencia de 3+). Null en partidos viejos o si
-        // el cliente no los manda (compatible con clientes previos a esto).
+        // tries_cuba/tries_rival: dato crudo, por si sirve más adelante.
+        // bonus_ofensivo/bonus_defensivo: YA RESUELTOS por la Ficha (updateScore,
+        // misma fórmula de siempre) — minutos-gs los muestra tal cual, sin
+        // recalcular, para que la regla del bonus viva en un solo lugar.
+        // Null/false en partidos viejos o si el cliente no los manda.
         const tc = r.triesCuba;
         const tr = r.triesRival;
         const up = await sb.from("ficha_partido_resultados").upsert({
@@ -216,6 +218,8 @@ Deno.serve(async (req: Request) => {
           origen: r.origen || "vivo",
           tries_cuba: (tc === undefined || tc === null) ? null : Number(tc),
           tries_rival: (tr === undefined || tr === null) ? null : Number(tr),
+          bonus_ofensivo: (typeof r.bonusOfCuba === "boolean") ? r.bonusOfCuba : null,
+          bonus_defensivo: (typeof r.bonusDefCuba === "boolean") ? r.bonusDefCuba : null,
         }, { onConflict: "n_partido" });
         if (up.error) return json({ error: "resultado: " + up.error.message }, 500);
 
