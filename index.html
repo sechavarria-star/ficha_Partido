@@ -1378,16 +1378,21 @@ function updateScore(){
   document.getElementById("triesCuba").textContent  = triesCuba  + (triesCuba===1?" try":" tries");
   document.getElementById("triesRival").textContent = triesRival + (triesRival===1?" try":" tries");
 
-  // Punto bonus por equipo: ofensivo (3+ tries de diferencia) + defensivo (pierde por <=7)
-  var bonusCuba = 0, bonusRival = 0;
-  if (triesCuba - triesRival >= 3) bonusCuba++;
-  if (triesRival - triesCuba >= 3) bonusRival++;
-  if (cuba < rival && (rival - cuba) <= 7) bonusCuba++;    // CUBA perdió por <=7
-  if (rival < cuba && (cuba - rival) <= 7) bonusRival++;   // RIVAL perdió por <=7
+  // Punto bonus por equipo: ofensivo (3+ tries de diferencia) + defensivo (pierde por <=7).
+  // bonusOfCuba/bonusDefCuba son la fuente de verdad: se mandan tal cual al tablero
+  // minutos-gs al finalizar (enviarMinutosATablero), que NO recalcula nada — así la
+  // regla vive en un solo lugar y no se puede desincronizar entre los dos sistemas.
+  var bonusOfCuba  = (triesCuba - triesRival) >= 3;
+  var bonusOfRival = (triesRival - triesCuba) >= 3;
+  var bonusDefCuba  = (cuba < rival && (rival - cuba) <= 7);   // CUBA perdió por <=7
+  var bonusDefRival = (rival < cuba && (cuba - rival) <= 7);   // RIVAL perdió por <=7
+  var bonusCuba  = (bonusOfCuba  ? 1 : 0) + (bonusDefCuba  ? 1 : 0);
+  var bonusRival = (bonusOfRival ? 1 : 0) + (bonusDefRival ? 1 : 0);
   pintarBonus("bonusCuba", bonusCuba);
   pintarBonus("bonusRival", bonusRival);
   resultadoActual = { cuba:cuba, rival:rival, bonusCuba:bonusCuba, bonusRival:bonusRival,
-                       triesCuba:triesCuba, triesRival:triesRival };
+                       triesCuba:triesCuba, triesRival:triesRival,
+                       bonusOfCuba:bonusOfCuba, bonusDefCuba:bonusDefCuba };
 }
 
 function pintarBonus(id, n){
@@ -1545,10 +1550,13 @@ function enviarMinutosATablero(){
       local: equipoCuba, visitante: rival,
       resultado: equipoCuba+" "+(r.cuba||0)+" - "+rival+" "+(r.rival||0),
       origen: "vivo",
-      // Tries por equipo, para que el tablero minutos-gs calcule el punto
-      // bonus ofensivo (4+ tries / diferencia de 3+ tries). Ver ficha-api.
+      // Tries por equipo (dato crudo, por si sirve más adelante) y los dos
+      // bonus YA RESUELTOS acá mismo (updateScore) — minutos-gs los muestra
+      // tal cual, sin recalcular, para que la regla viva en un solo lugar.
       triesCuba: (r.triesCuba != null ? r.triesCuba : null),
-      triesRival: (r.triesRival != null ? r.triesRival : null)
+      triesRival: (r.triesRival != null ? r.triesRival : null),
+      bonusOfCuba: (r.bonusOfCuba === true),
+      bonusDefCuba: (r.bonusDefCuba === true)
     };
     sbApi("syncParticipaciones", { resultado: resultado, participaciones: participaciones })
       .then(function(res){
