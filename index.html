@@ -440,6 +440,7 @@ body.light .zoom-toggle{color:#516686;}
     <input id="pdfInput" type="file" accept="application/pdf" multiple style="display:none" onchange="onPdfsSeleccionados(this.files)" />
     <button class="btn-cargar" id="btnCargarPlanillas" onclick="document.getElementById('pdfInput').click()">SUBIR PLANILLAS PDF</button>
     <div id="planillaBadge"></div>
+    <button id="btnInformar" onclick="informarResultado()" style="width:100%;margin-top:12px;background:#229ED9;color:#fff;border:none;border-radius:10px;padding:14px;font-weight:700;font-size:15px;letter-spacing:.5px;cursor:pointer;">&#128242; INFORMAR RESULTADO</button>
   </div>
 
   <div class="section-title">Jugadores CUBA <span class="titulares-count" id="titularesCount"></span></div>
@@ -708,6 +709,22 @@ body.light .zoom-toggle{color:#516686;}
   </div>
 </div>
 
+<!-- MODAL INFORMAR RESULTADO (PIN) -->
+<div class="modal-overlay" id="informarOverlay" onclick="if(event.target===this)cerrarInformar()">
+  <div class="modal">
+    <div class="modal-title">&#128242; Informar resultado</div>
+    <div class="modal-field">
+      <div class="modal-label" id="informarSub">Ingresá el PIN para enviar el resultado por Telegram.</div>
+      <input type="password" id="informarPin" inputmode="numeric" pattern="[0-9]*" placeholder="PIN" autocomplete="off" maxlength="6" onkeydown="if(event.key==='Enter')confirmarInformar()" />
+      <div id="informarStatus" style="margin-top:8px;font-size:13px;min-height:16px;"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarInformar()">Cancelar</button>
+      <button class="btn-confirm" id="informarOk" onclick="confirmarInformar()">ENVIAR</button>
+    </div>
+  </div>
+</div>
+
 <!-- ZOOM SLIDER BAR -->
 <div class="zoom-bar" id="zoomBar">
   <label>ZOOM</label>
@@ -745,7 +762,7 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-08-31.1";
+var APP_VERSION = "2026-09-12.1";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
@@ -1144,6 +1161,38 @@ function _confirmClose(){ document.getElementById("confirmOverlay").classList.re
 document.getElementById("confirmOk").addEventListener("click", function(){ var cb=_confirmCb; _confirmClose(); if(cb) cb(); });
 document.getElementById("confirmCancel").addEventListener("click", _confirmClose);
 document.getElementById("confirmOverlay").addEventListener("click", function(e){ if(e.target===this) _confirmClose(); });
+
+// ---- Informar resultado por Telegram (PIN 2505) ----
+// Manda el "Resultado M15" del día seleccionado (fechaSel) al Telegram del club
+// vía el backend minutos-gs (bot @Rugby_Ficha_bot, token server-side). Si el día
+// seleccionado no tiene resultados cargados, cae al último finde jugado (fallback=1).
+var MINUTOS_API  = "https://script.google.com/macros/s/AKfycbweYkAXv6YxCSJUtWo-rWAWanijvElnoYSKTJzx4X33jcGYa4LEvWt4aPN0nevhTbmf9g/exec";
+var INFORMAR_PIN = "2505";
+function _fechaCorta(iso){ var p=String(iso||"").split("-"); return p.length===3 ? (p[2]+"/"+p[1]) : (iso||""); }
+function informarResultado(){
+  var st=document.getElementById("informarStatus"); if(st){ st.textContent=""; }
+  var pin=document.getElementById("informarPin"); if(pin){ pin.value=""; }
+  var sub=document.getElementById("informarSub");
+  if(sub) sub.textContent = "Se informa el resultado del "+(fechaSel?_fechaCorta(fechaSel):"último finde")+". Ingresá el PIN.";
+  document.getElementById("informarOverlay").classList.add("open");
+  if(pin) setTimeout(function(){ pin.focus(); }, 100);
+}
+function cerrarInformar(){ document.getElementById("informarOverlay").classList.remove("open"); }
+function confirmarInformar(){
+  var st=document.getElementById("informarStatus");
+  var pin=(document.getElementById("informarPin").value||"").trim();
+  if(pin!==INFORMAR_PIN){ if(st){ st.style.color="#f87171"; st.textContent="PIN incorrecto."; } return; }
+  var btn=document.getElementById("informarOk"); if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
+  if(st){ st.style.color="#8aa0bd"; st.textContent="Enviando…"; }
+  var url=MINUTOS_API+"?action=telegramM15&fecha="+encodeURIComponent(fechaSel||"")+"&fallback=1&_="+Date.now();
+  fetch(url,{cache:"no-store"}).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+    .then(function(res){
+      if(btn){ btn.disabled=false; btn.textContent="ENVIAR"; }
+      if(res && res.ok){ if(st){ st.style.color="#22c55e"; st.textContent="✓ Enviado ("+res.fecha+")"; } setTimeout(cerrarInformar,1500); }
+      else { if(st){ st.style.color="#f87171"; st.textContent="No se pudo: "+((res&&res.error)||"error"); } }
+    })
+    .catch(function(e){ if(btn){ btn.disabled=false; btn.textContent="ENVIAR"; } if(st){ st.style.color="#f87171"; st.textContent="Error: "+(e&&e.message?e.message:e); } });
+}
 
 // Cada tick recalcula el tiempo REAL transcurrido (no cuenta ticks). Así el
 // reloj sobrevive a que la tablet se duerma/hiberne: al despertar recalcula.
