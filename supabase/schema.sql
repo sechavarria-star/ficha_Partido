@@ -54,3 +54,49 @@ alter table ficha_partido_partidos enable row level security;
 alter table ficha_partido_roster   enable row level security;
 alter table ficha_partido_eventos  enable row level security;
 -- (sin policies: solo la service_role key, usada server-side, accede)
+
+-- ============================================================
+-- Consolidación para el tablero de minutos (minutos-gs / appcuba.giwa-ia.com).
+-- Las escribe ficha-api (acción syncParticipaciones) al finalizar un partido.
+-- Sin FK a ficha_partido_partidos a propósito: también guardan el histórico
+-- migrado de la hoja "Resume de Partidos", que no tiene planilla cargada.
+-- No tienen DNI, así que se dejan leer con la anon key (minutos-gs lee por REST).
+-- Historia de cómo se crearon: migracion-minutos.sql. Acá va el estado real de la
+-- base (verificado 2026-10-03). Ojo: bonus_ofensivo/bonus_defensivo están en
+-- migracion-minutos.sql y en ficha-api del repo, pero TODAVÍA NO en la base ni
+-- en la ficha-api desplegada.
+-- ============================================================
+
+create table if not exists ficha_partido_resultados (
+  n_partido   text primary key,
+  fecha       date,
+  local       text,                           -- 'CUBA A'.. (la Ficha siempre manda CUBA como local)
+  visitante   text,
+  resultado   text,                           -- 'CUBA A 28 - Champagnat A 24'
+  origen      text default 'vivo',            -- vivo / migracion
+  created_at  timestamptz default now(),
+  tries_cuba  int,                            -- para el bonus ofensivo; null en partidos viejos
+  tries_rival int
+);
+
+create table if not exists ficha_partido_participaciones (
+  id         bigint generated always as identity primary key,
+  n_partido  text not null,
+  fecha      date,
+  equipo     text,
+  dorsal     int,
+  jugador    text,                            -- 'Apellido, Nombre' (sin '#N')
+  minutos    int  default 0,
+  puntos     int  default 0,
+  origen     text default 'vivo',
+  created_at timestamptz default now()
+);
+create index if not exists ficha_partido_participaciones_idx on ficha_partido_participaciones(n_partido);
+create index if not exists ficha_partido_participaciones_jug on ficha_partido_participaciones(jugador);
+
+alter table ficha_partido_resultados      enable row level security;
+alter table ficha_partido_participaciones enable row level security;
+drop policy if exists ficha_partido_resultados_read on ficha_partido_resultados;
+create policy ficha_partido_resultados_read on ficha_partido_resultados for select using (true);
+drop policy if exists ficha_partido_participaciones_read on ficha_partido_participaciones;
+create policy ficha_partido_participaciones_read on ficha_partido_participaciones for select using (true);
