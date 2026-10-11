@@ -762,7 +762,7 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-09-12.1";
+var APP_VERSION = "2026-10-10.1";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
@@ -1146,6 +1146,15 @@ function buildPeriodoRow(cantT){
     (function(code){ pb.addEventListener("click", function(){ setPeriodo(code); }); })(codes[i]);
     periodoRow.appendChild(pb);
   }
+  periodo = "1T";   // la variable acompaña al botón activo (si no, un partido nuevo hereda el 2T del anterior)
+}
+
+// Tiempo a retomar tras un refresco: el guardado en el respaldo, o el más
+// avanzado que tenga un evento (la base no guarda el período en curso).
+function _periodoRestaurado(guardado){
+  var orden = {"1T":1,"2T":2,"3T":3}, p = guardado || "1T";
+  (eventos||[]).forEach(function(e){ if ((orden[e.periodo]||0) > (orden[p]||0)) p = e.periodo; });
+  return p;
 }
 
 // ---- TIMER ----
@@ -1293,6 +1302,7 @@ function _aplicarPeriodo(p){
   for (var i=0;i<codes.length;i++){
     if (codes[i]===p){ var el=document.getElementById(ids[i]); if(el) el.classList.add("active"); }
   }
+  guardarBackupLocal();   // el respaldo local recuerda en qué tiempo estamos
 }
 function setPeriodo(p){
   var orden = {"1T":1,"2T":2,"3T":3}, labels = {"1T":"1er","2T":"2do","3T":"3er"};
@@ -1300,7 +1310,7 @@ function setPeriodo(p){
   if (avanza){
     // Confirmar (por si se toca sin querer): al pasar de tiempo se reinicia el reloj.
     mostrarConfirm("¿Pasar al "+(labels[p]||p)+" tiempo? El cronómetro se reinicia a 00:00 (no borra las incidencias).",
-      function(){ _aplicarPeriodo(p); _resetClock(); }, "&#9202;&#65039;");
+      function(){ _resetClock(); _aplicarPeriodo(p); }, "&#9202;&#65039;");
     return;
   }
   _aplicarPeriodo(p);   // volver atrás / mismo: solo cambia la etiqueta, sin reset
@@ -1793,7 +1803,7 @@ function guardarBackupLocal(){
     if (!partido || !partido.rival) return;
     localStorage.setItem("ficha_backup", JSON.stringify({
       partido: partido, eventos: eventos, jugadores: jugadores,
-      startTimestamp: startTimestamp, ts: Date.now()
+      startTimestamp: startTimestamp, periodo: periodo, ts: Date.now()
     }));
   } catch(e){}
 }
@@ -1835,7 +1845,7 @@ function checkRecovery(){
 }
 
 // Aplica un partido restaurado (partido+eventos+jugadores+startTimestamp ya seteados) a la pantalla.
-function _montarPartidoRestaurado(ts){
+function _montarPartidoRestaurado(ts, per){
   document.getElementById("scoreRivalLabel").textContent = (partido.rival||"").toUpperCase();
   document.getElementById("headerTitle").textContent   = "CUBA vs "+(partido.rival||"").toUpperCase();
   document.getElementById("headerMeta").textContent    = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
@@ -1855,6 +1865,7 @@ function _montarPartidoRestaurado(ts){
     document.getElementById("timerDisplay").classList.add("running");
     setEventButtonsEnabled(true);
   } else { setEventButtonsEnabled(false); }
+  _aplicarPeriodo(_periodoRestaurado(per));   // al final: ya con startTimestamp, para que el respaldo no lo pierda
 }
 
 function retomarPartido(){
@@ -1868,7 +1879,7 @@ function retomarPartido(){
     jugadores = (b.jugadores||[]).map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
     renderJugadores();
     eventos   = (b.eventos||[]).map(function(e){ return {tipo:e.tipo,pts:Number(e.pts)||0,icon:e.icon||ICON_MAP[e.tipo]||"&#x1F3C9;",jugador:e.jugador,minuto:e.minuto,periodo:e.periodo,equipo:e.equipo||"CUBA"}; });
-    _montarPartidoRestaurado(b.startTimestamp);
+    _montarPartidoRestaurado(b.startTimestamp, b.periodo);
     sincronizar();   // reintenta subir a Supabase por si se había perdido
     return;
   }
@@ -1904,6 +1915,7 @@ function retomarPartido(){
       document.getElementById("timerDisplay").classList.add("running");
       setEventButtonsEnabled(true);
     } else { setEventButtonsEnabled(false); }
+    _aplicarPeriodo(_periodoRestaurado());
   }).catch(function(){});
 }
 
