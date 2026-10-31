@@ -289,6 +289,18 @@ input,select,textarea{font-size:16px !important;}
 .btn-event:disabled{opacity:.3;cursor:not-allowed;}
 .btn-card:disabled{opacity:.3;cursor:not-allowed;}
 
+/* SIN-BIN: reloj flotante de las amarillas propias */
+.sinbin-wrap{position:fixed;right:10px;top:90px;z-index:900;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none;}
+.sinbin{pointer-events:auto;display:flex;align-items:center;gap:8px;background:var(--navy-card);border:2px solid var(--yellow);border-radius:10px;padding:4px 4px 4px 10px;box-shadow:0 8px 24px rgba(0,0,0,.45);}
+.sinbin .sb-card{width:14px;height:19px;border-radius:2px;background:var(--yellow);flex-shrink:0;}
+.sinbin .sb-jug{font-size:12px;color:var(--white);max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sinbin .sb-time{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;line-height:1;color:var(--yellow);min-width:62px;text-align:right;}
+.sinbin.paused .sb-time{opacity:.5;}
+.sinbin.done{border-color:#22c55e;animation:sbPulse 1s ease-in-out infinite;}
+.sinbin.done .sb-time{color:#22c55e;font-size:20px;}
+.sinbin .sb-x{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 6px;}
+@keyframes sbPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.6);}50%{box-shadow:0 0 0 8px rgba(34,197,94,0);}}
+
 /* PRINT */
 @media print{
   .app-header,.fab-export,.timer-btns,.events-section,.btn-volver,.export-btns,.zoom-bar,.zoom-toggle,.btn-finalizar,#finalizarStatus{display:none!important;}
@@ -733,6 +745,7 @@ body.light .zoom-toggle{color:#516686;}
   <button class="zoom-close" onclick="toggleZoomBar()" title="Ocultar">&#10005;</button>
 </div>
 <button class="zoom-toggle" id="zoomToggle" style="display:none;" onclick="toggleZoomBar()">&#128269; ZOOM</button>
+<div class="sinbin-wrap" id="sinbinWrap"></div>
 
 <script>
 // ---- ZOOM ----
@@ -762,7 +775,7 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-10-10.1";
+var APP_VERSION = "2026-10-30.1";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
@@ -817,6 +830,8 @@ var eventos        = [];
 var timerSecs      = 0;
 var timerInt       = null;
 var periodo        = "1T";
+var sinbins        = [];     // amarillas propias en curso: [{id, jug, rest (segundos)}]
+var _sbLastSecs    = null;   // timerSecs del último descuento del sin-bin
 var partido        = {};
 var modalData      = {};
 var modalJugSel    = null;   // jugador elegido en el buscador del modal de evento
@@ -1131,6 +1146,7 @@ function iniciarPartido(){
   if (true){
     sbApi("syncRoster", { nPartido: getPartidoId(), jugadores: jugadores });
   }
+  limpiarSinbins();   // partido nuevo: sin amarillas pendientes del anterior
 }
 
 function buildPeriodoRow(cantT){
@@ -1209,6 +1225,51 @@ function tickTimer(){
   if (startTimestamp) timerSecs = Math.floor((Date.now() - startTimestamp) / 1000);
   else timerSecs++;
   updateTimerDisplay();
+  avanzarSinbins();
+}
+
+// ---- SIN-BIN (amarillas propias): 10 min de juego, corre con el reloj del partido ----
+// Se descuenta lo que avanza timerSecs: con el reloj detenido no baja, y al pasar
+// de tiempo (reloj a 00:00) sigue en el siguiente. Va en el respaldo local.
+// (estado: sinbins / _sbLastSecs, declarados arriba con las demás globales)
+function iniciarSinbin(jug){
+  sinbins.push({ id: Date.now(), jug: jug, rest: 600 });
+  _sbLastSecs = timerSecs;
+  renderSinbins();
+}
+function avanzarSinbins(){
+  if (_sbLastSecs === null || timerSecs < _sbLastSecs){ _sbLastSecs = timerSecs; return; }   // arranque o cambio de tiempo
+  var d = timerSecs - _sbLastSecs; _sbLastSecs = timerSecs;
+  if (!d || !sinbins.length) return;
+  sinbins.forEach(function(s){
+    if (s.rest > 0){
+      s.rest = Math.max(0, s.rest - d);
+      if (s.rest === 0){ try { if (navigator.vibrate) navigator.vibrate([300,150,300]); } catch(e){} }
+    }
+  });
+  renderSinbins();
+}
+function cerrarSinbin(id){
+  sinbins = sinbins.filter(function(s){ return s.id !== id; });
+  renderSinbins(); guardarBackupLocal();
+}
+function limpiarSinbins(){ sinbins = []; _sbLastSecs = null; renderSinbins(); }
+function renderSinbins(){
+  var wrap = document.getElementById("sinbinWrap");
+  if (!wrap) return;
+  var enPartido = document.getElementById("screenMatch").classList.contains("active");
+  if (!enPartido || !sinbins.length){ wrap.innerHTML = ""; return; }
+  var hdr = document.querySelector(".app-header");   // justo debajo del encabezado fijo (queda sobre el marcador, que no se toca)
+  if (hdr) wrap.style.top = (hdr.getBoundingClientRect().bottom + 8) + "px";
+  wrap.innerHTML = sinbins.map(function(s){
+    var m = Math.floor(s.rest/60), sec = s.rest%60;
+    var t = s.rest > 0 ? ((m<10?"0":"")+m+":"+(sec<10?"0":"")+sec) : "PUEDE VOLVER";
+    var cls = "sinbin" + (s.rest === 0 ? " done" : (!timerInt ? " paused" : ""));
+    var jug = String(s.jug||"").replace(/[<>&"]/g, function(c){ return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]; });
+    return '<div class="'+cls+'"><span class="sb-card"></span><span class="sb-jug">'+jug+'</span>'
+         + '<span class="sb-time">'+t+'</span>'
+         + '<button class="sb-x" onclick="cerrarSinbin('+s.id+')" title="Cerrar">&#10005;</button></div>';
+  }).join("");
 }
 
 function detenerTimer(){
@@ -1380,6 +1441,7 @@ function confirmarEvento(){
   var m=Math.floor(timerSecs/60), s=timerSecs%60;
   var minStr=(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
   eventos.push({ tipo:modalData.tipo, pts:modalData.pts, icon:modalData.icon, jugador:jugLabel, minuto:minStr, periodo:periodo, equipo:modalData.equipo||"CUBA" });
+  if (modalData.tipo === "Tarjeta Amarilla" && (modalData.equipo||"CUBA") === "CUBA") iniciarSinbin(jugLabel);
   closeModal();
   updateScore();
   renderHistorial();
@@ -1639,6 +1701,7 @@ function finalizarPartido(){
       .then(function(res){
         if (res && res.ok){
           borrarBackupLocal();   // partido cerrado: ya no hace falta el respaldo
+          limpiarSinbins();
           clearInterval(timerInt); timerInt=null;   // frenar el reloj
           window.__resumenView = true;              // "Volver" ahora lleva al inicio
           var bv=document.getElementById("btnVolver"); if(bv) bv.innerHTML="&#8592; Ir al inicio";
@@ -1792,6 +1855,7 @@ function confirmarEdicion(){
 // ---- EVENT BUTTONS ENABLE/DISABLE ----
 function setEventButtonsEnabled(enabled){
   document.querySelectorAll('.btn-event,.btn-card,.btn-cambio').forEach(function(btn){ btn.disabled=!enabled; });
+  renderSinbins();   // se llama al arrancar/detener el reloj: actualiza el "en pausa" del sin-bin
 }
 
 // ---- RECOVERY ----
@@ -1803,7 +1867,8 @@ function guardarBackupLocal(){
     if (!partido || !partido.rival) return;
     localStorage.setItem("ficha_backup", JSON.stringify({
       partido: partido, eventos: eventos, jugadores: jugadores,
-      startTimestamp: startTimestamp, periodo: periodo, ts: Date.now()
+      startTimestamp: startTimestamp, periodo: periodo,
+      sinbins: sinbins, sbLast: _sbLastSecs, ts: Date.now()
     }));
   } catch(e){}
 }
@@ -1879,7 +1944,9 @@ function retomarPartido(){
     jugadores = (b.jugadores||[]).map(function(j){ return {num:j.num||"?", nom:j.nom, dni:j.dni||""}; });
     renderJugadores();
     eventos   = (b.eventos||[]).map(function(e){ return {tipo:e.tipo,pts:Number(e.pts)||0,icon:e.icon||ICON_MAP[e.tipo]||"&#x1F3C9;",jugador:e.jugador,minuto:e.minuto,periodo:e.periodo,equipo:e.equipo||"CUBA"}; });
+    sinbins = b.sinbins || []; _sbLastSecs = (b.sbLast != null ? b.sbLast : null);   // antes de montar: _aplicarPeriodo guarda el respaldo
     _montarPartidoRestaurado(b.startTimestamp, b.periodo);
+    renderSinbins();
     sincronizar();   // reintenta subir a Supabase por si se había perdido
     return;
   }
@@ -1935,6 +2002,7 @@ function getPartidoId(){
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(function(s){ s.classList.remove("active"); });
   document.getElementById(id).classList.add("active");
+  renderSinbins();   // el reloj flotante solo se ve en la pantalla del partido
 }
 </script>
 </body>
