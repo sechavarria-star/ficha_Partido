@@ -159,6 +159,8 @@ input,select,textarea{font-size:16px !important;}
 .timer-display{font-family:'Bebas Neue',sans-serif;font-size:96px;letter-spacing:4px;color:var(--white);line-height:1;margin-bottom:10px;}
 .timer-display.running{color:#4ade80;}
 .timer-display.overtime{color:var(--red);}
+.timer-display.paused{color:var(--amber);animation:pausaBlink 1.2s ease-in-out infinite;}
+@keyframes pausaBlink{0%,100%{opacity:1}50%{opacity:.45}}
 .progress-wrap{background:var(--border);border-radius:6px;height:10px;overflow:hidden;margin-bottom:6px;}
 .progress-bar{height:100%;border-radius:4px;background:#4ade80;transition:width .5s linear,background .3s;}
 .progress-bar.overtime{background:var(--red);}
@@ -169,11 +171,16 @@ input,select,textarea{font-size:16px !important;}
 .periodo-row{display:flex;gap:6px;justify-content:center;margin-bottom:8px;flex-wrap:wrap;}
 .periodo-btn{padding:12px 24px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:18px;font-weight:600;cursor:pointer;}
 .periodo-btn.active{border-color:var(--blue-light);background:rgba(46,111,212,.15);color:var(--white);}
-.timer-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.timer-btns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.timer-btns .btn-timer{padding:16px 4px;font-size:22px;min-width:0;}
 .btn-timer{padding:18px;border:none;border-radius:var(--radius-sm);font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;cursor:pointer;}
 .btn-start{background:var(--green);color:#fff;}
 .btn-stop{background:var(--red);color:#fff;}
 .btn-reset{background:var(--navy-mid);color:var(--muted);border:1px solid var(--border);}
+.btn-pausa{background:rgba(217,119,6,.15);color:var(--amber);border:1.5px solid var(--amber);line-height:1.05;}
+.btn-pausa.on{background:var(--amber);color:#fff;}
+.btn-pausa small{display:block;font-family:'DM Sans',sans-serif;font-size:13px;letter-spacing:0;font-weight:600;}
+.btn-timer:disabled{opacity:.35;cursor:not-allowed;}
 
 /* TEAM TABS */
 .team-tabs{display:grid;grid-template-columns:1fr 1fr;border-radius:var(--radius-sm);overflow:hidden;border:1.5px solid var(--border);margin-bottom:8px;}
@@ -504,6 +511,7 @@ body.light .zoom-toggle{color:#516686;}
     </div>
     <div class="timer-btns">
       <button class="btn-timer btn-start" id="btnStartStop" onclick="toggleTimer()">INICIAR</button>
+      <button class="btn-timer btn-pausa" id="btnPausa" onclick="togglePausa()" disabled>PAUSA</button>
       <button class="btn-timer btn-reset" onclick="resetTimer()">REINICIAR</button>
     </div>
   </div>
@@ -775,7 +783,7 @@ function toggleZoomBar() {
 })();
 
 // ---- VERSIÓN (para verificar que la tablet bajó la última) ----
-var APP_VERSION = "2026-10-30.1";
+var APP_VERSION = "2026-10-30.2";
 (function(){ var v=document.getElementById("appVersion"); if(v) v.textContent = "versión "+APP_VERSION; })();
 
 // ---- ESTADO DE LA BASE (LED conexión + última sincronización) ----
@@ -832,6 +840,8 @@ var timerInt       = null;
 var periodo        = "1T";
 var sinbins        = [];     // amarillas propias en curso: [{id, jug, rest (segundos)}]
 var _sbLastSecs    = null;   // timerSecs del último descuento del sin-bin
+var pausaDesde     = null;   // ms en que se pausó (atención de un jugador); null = no está en pausa
+var pausaInt       = null;
 var partido        = {};
 var modalData      = {};
 var modalJugSel    = null;   // jugador elegido en el buscador del modal de evento
@@ -1274,29 +1284,68 @@ function renderSinbins(){
 
 function detenerTimer(){
   clearInterval(timerInt); timerInt = null;
+  _salirDePausa();
   document.getElementById("btnStartStop").textContent  = "CONTINUAR";
   document.getElementById("btnStartStop").className    = "btn-timer btn-start";
   document.getElementById("timerDisplay").classList.remove("running");
   setEventButtonsEnabled(false);
+  guardarBackupLocal();   // así un refresco no lo retoma como si siguiera corriendo
 }
 
 function toggleTimer(){
   if (timerInt){
     mostrarConfirm("¿Detener el cronómetro?", detenerTimer, "&#9208;&#65039;");
   } else {
-    // Rebasar el arranque al tiempo real (maneja pausa Y sleep):
-    // elapsed = ahora - startTimestamp, partiendo del timerSecs actual.
-    startTimestamp = Date.now() - (timerSecs * 1000);
-    if (partido && partido.rival){
-      var pid = getPartidoId();
-      if (pid) sbApi("setTimestamp", { nPartido: pid, ts: startTimestamp }).then(function(res){ if(res&&res.ok) marcarSync(); });
-    }
-    guardarBackupLocal();   // respaldo local con el arranque del cronómetro
-    timerInt = setInterval(tickTimer, 1000);
-    document.getElementById("btnStartStop").textContent  = "DETENER";
-    document.getElementById("btnStartStop").className    = "btn-timer btn-stop";
-    document.getElementById("timerDisplay").classList.add("running");
-    setEventButtonsEnabled(true);
+    _arrancarReloj();
+  }
+}
+
+// Arranca/continúa el reloj desde el timerSecs actual.
+function _arrancarReloj(){
+  // Rebasar el arranque al tiempo real (maneja pausa Y sleep):
+  // elapsed = ahora - startTimestamp, partiendo del timerSecs actual.
+  startTimestamp = Date.now() - (timerSecs * 1000);
+  if (partido && partido.rival){
+    var pid = getPartidoId();
+    if (pid) sbApi("setTimestamp", { nPartido: pid, ts: startTimestamp }).then(function(res){ if(res&&res.ok) marcarSync(); });
+  }
+  _salirDePausa();
+  guardarBackupLocal();   // respaldo local con el arranque del cronómetro
+  timerInt = setInterval(tickTimer, 1000);
+  document.getElementById("btnStartStop").textContent  = "DETENER";
+  document.getElementById("btnStartStop").className    = "btn-timer btn-stop";
+  document.getElementById("timerDisplay").classList.add("running");
+  setEventButtonsEnabled(true);
+}
+
+// ---- PAUSA (atención de un jugador): un toque, sin confirmar ----
+// Congela el reloj (y los sin-bin) pero deja cargar eventos, p. ej. un cambio.
+function togglePausa(){
+  if (pausaDesde){ _arrancarReloj(); return; }   // REANUDAR
+  if (!timerInt) return;                          // solo con el reloj corriendo
+  tickTimer();                                    // congela en el segundo exacto
+  clearInterval(timerInt); timerInt = null;
+  pausaDesde = Date.now();
+  pausaInt = setInterval(_pintarPausa, 1000);
+  document.getElementById("btnStartStop").disabled = true;
+  _pintarPausa(); updateTimerDisplay(); renderSinbins();
+  guardarBackupLocal();
+}
+function _salirDePausa(){
+  pausaDesde = null;
+  clearInterval(pausaInt); pausaInt = null;
+  var bs = document.getElementById("btnStartStop"); if (bs) bs.disabled = false;
+  _pintarPausa();
+}
+function _pintarPausa(){
+  var b = document.getElementById("btnPausa");
+  if (!b) return;
+  if (pausaDesde){
+    var s = Math.max(0, Math.floor((Date.now() - pausaDesde)/1000)), m = Math.floor(s/60); s = s%60;
+    b.innerHTML = 'REANUDAR<small>'+(m<10?"0":"")+m+":"+(s<10?"0":"")+s+' en pausa</small>';
+    b.className = "btn-timer btn-pausa on"; b.disabled = false;
+  } else {
+    b.textContent = "PAUSA"; b.className = "btn-timer btn-pausa"; b.disabled = !timerInt;
   }
 }
 
@@ -1307,6 +1356,7 @@ window.addEventListener("focus", function(){ if (timerInt) tickTimer(); });
 // Reset del cronómetro a 00:00 (sin confirmar). No borra las incidencias.
 function _resetClock(){
   clearInterval(timerInt); timerInt = null;
+  _salirDePausa();
   timerSecs = 0; startTimestamp = null;
   updateTimerDisplay();
   document.getElementById("btnStartStop").textContent = "INICIAR";
@@ -1342,7 +1392,7 @@ function updateProgress(){
   bar.style.width = pct+"%";
   bar.className   = "progress-bar"+(overtime?" overtime":"");
   var running     = document.getElementById("btnStartStop").textContent==="DETENER";
-  disp.className  = "timer-display"+(overtime?" overtime":(running?" running":""));
+  disp.className  = "timer-display"+(pausaDesde?" paused":(overtime?" overtime":(running?" running":"")));
   if (overtime){
     var over = timerSecs-totalSecs;
     var om=Math.floor(over/60), os=over%60;
@@ -1856,6 +1906,7 @@ function confirmarEdicion(){
 function setEventButtonsEnabled(enabled){
   document.querySelectorAll('.btn-event,.btn-card,.btn-cambio').forEach(function(btn){ btn.disabled=!enabled; });
   renderSinbins();   // se llama al arrancar/detener el reloj: actualiza el "en pausa" del sin-bin
+  _pintarPausa();
 }
 
 // ---- RECOVERY ----
@@ -1868,7 +1919,9 @@ function guardarBackupLocal(){
     localStorage.setItem("ficha_backup", JSON.stringify({
       partido: partido, eventos: eventos, jugadores: jugadores,
       startTimestamp: startTimestamp, periodo: periodo,
-      sinbins: sinbins, sbLast: _sbLastSecs, ts: Date.now()
+      sinbins: sinbins, sbLast: _sbLastSecs,
+      relojParado: (!timerInt && startTimestamp) ? timerSecs : null,   // detenido o en pausa: el reloj NO siguió
+      pausaDesde: pausaDesde, ts: Date.now()
     }));
   } catch(e){}
 }
@@ -1910,7 +1963,7 @@ function checkRecovery(){
 }
 
 // Aplica un partido restaurado (partido+eventos+jugadores+startTimestamp ya seteados) a la pantalla.
-function _montarPartidoRestaurado(ts, per){
+function _montarPartidoRestaurado(ts, per, b){
   document.getElementById("scoreRivalLabel").textContent = (partido.rival||"").toUpperCase();
   document.getElementById("headerTitle").textContent   = "CUBA vs "+(partido.rival||"").toUpperCase();
   document.getElementById("headerMeta").textContent    = [partido.fecha,partido.camada,partido.cancha].filter(Boolean).join(" | ");
@@ -1920,7 +1973,23 @@ function _montarPartidoRestaurado(ts, per){
   buildPeriodoRow(partido.cantT||2);
   setTeamTab("CUBA"); updateScore(); renderHistorial();
   showScreen("screenMatch");
-  if (ts){
+  if (ts && b && b.relojParado != null){
+    // Estaba en pausa o detenido: el reloj quedó congelado, no se recalcula desde el arranque.
+    startTimestamp=ts;
+    timerSecs=b.relojParado;
+    if (b.pausaDesde){
+      pausaDesde=b.pausaDesde; pausaInt=setInterval(_pintarPausa,1000);
+      document.getElementById("btnStartStop").textContent="DETENER";
+      document.getElementById("btnStartStop").className="btn-timer btn-stop";
+      document.getElementById("btnStartStop").disabled=true;
+      setEventButtonsEnabled(true);
+    } else {
+      document.getElementById("btnStartStop").textContent="CONTINUAR";
+      document.getElementById("btnStartStop").className="btn-timer btn-start";
+      setEventButtonsEnabled(false);
+    }
+    updateTimerDisplay();
+  } else if (ts){
     startTimestamp=ts;
     timerSecs=Math.max(0,Math.floor((Date.now()-ts)/1000));
     updateTimerDisplay();
@@ -1945,7 +2014,7 @@ function retomarPartido(){
     renderJugadores();
     eventos   = (b.eventos||[]).map(function(e){ return {tipo:e.tipo,pts:Number(e.pts)||0,icon:e.icon||ICON_MAP[e.tipo]||"&#x1F3C9;",jugador:e.jugador,minuto:e.minuto,periodo:e.periodo,equipo:e.equipo||"CUBA"}; });
     sinbins = b.sinbins || []; _sbLastSecs = (b.sbLast != null ? b.sbLast : null);   // antes de montar: _aplicarPeriodo guarda el respaldo
-    _montarPartidoRestaurado(b.startTimestamp, b.periodo);
+    _montarPartidoRestaurado(b.startTimestamp, b.periodo, b);
     renderSinbins();
     sincronizar();   // reintenta subir a Supabase por si se había perdido
     return;
